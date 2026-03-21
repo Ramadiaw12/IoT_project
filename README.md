@@ -47,21 +47,30 @@ Capteur RFID ──► Client Python ──► HTTP POST ──► Flask Server 
 
 ```
 IoT_project/
+├── 📂 notebooks/ 
+├── 📂 dashboard/ 
 ├── 📂 db/
-│   └── iot_monitoring.db        ← SQLite (créée automatiquement)
+│   └── iot_monitoring.db
+    └── schema.db        ← SQLite (créée automatiquement)
 │
 ├── 📂 data/
-│   ├── dataset.csv              ← Jeu de données d'entrée
-│   ├── netlog_s1.csv            ← Logs réseau — Stratégie S1
-│   ├── netlog_s2.csv            ← Logs réseau — Stratégie S2
-│   └── netlog_s3.csv            ← Logs réseau — Stratégie S3
+│   ├── benign.csv              ← Jeu de données d'entrée
+│   ├── netlogs1.csv            ← Logs réseau — Stratégie S1
+│   ├── rfid_presence_monitoring_dataset.csv            ← Logs réseau — Stratégie S2
+│              ← Logs réseau — Stratégie S3
 │
+└── 📂 reports/
 └── 📂 src/
-    ├── server.py                ← Serveur Flask (port 5000)
+    ├── server_api.py                ← Serveur Flask (port 5000)
     ├── client_common.py         ← Librairie commune
     ├── client_s1.py             ← Client stratégie S1
     ├── client_s2.py             ← Client stratégie S2
-    └── client_s3.py             ← Client stratégie S3
+    └── client_s3.py              ← Client stratégie S3
+    └── anomaly_detection.py
+    └── preprocessing.py
+    └── visualization.py  
+  
+        
 ```
 
 ### Diagramme système
