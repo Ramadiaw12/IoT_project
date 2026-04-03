@@ -3,1016 +3,1830 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IoT Workflow — Système de Surveillance</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&family=Clash+Display:wght@500;600;700&display=swap" rel="stylesheet">
+<title>IoT Edge Monitor — TinyML Présence & Accès</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,300&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <style>
+/* ==============================
+   CSS VARIABLES & RESET
+============================== */
 :root {
-  --bg:      #0b0f13;
-  --surface: #111820;
-  --card:    #141c26;
-  --border:  #1e3048;
-  --border2: #243850;
-
-  --input:  #1a4a7a;
-  --input-b: #4a9eff;
-  --input-t: #b8d8ff;
-
-  --proc:   #1a4a30;
-  --proc-b: #22c974;
-  --proc-t: #a0f5c0;
-
-  --output: #4a2a10;
-  --output-b:#f59e22;
-  --output-t:#ffe0a0;
-
-  --decision:#3a1a5a;
-  --decision-b:#c060ff;
-  --decision-t:#e8b0ff;
-
-  --phase1: #1c3060;
-  --phase2: #1a3a28;
-  --phase3: #3a2010;
-  --phase4: #2a1a40;
-
-  --text:   #d8e8f5;
-  --muted:  #3a5a75;
-  --dim:    #1e3550;
-
-  --arrow:  #00d4ff;
-  --yes-c:  #22c974;
-  --no-c:   #ff4444;
+  --cream: #F7F3EE;
+  --warm-white: #FDFAF7;
+  --orange: #E8622A;
+  --orange-light: #F0844E;
+  --orange-pale: #FDE8DC;
+  --brown: #3D2B1F;
+  --brown-mid: #6B4C3B;
+  --sand: #C4A882;
+  --sand-light: #E8D9C5;
+  --charcoal: #2A2420;
+  --gray: #8C7B72;
+  --gray-light: #D4C8BF;
+  --green-accent: #4CAF7A;
+  --blue-accent: #3A7BD5;
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --radius: 16px;
+  --radius-lg: 28px;
+  --shadow: 0 8px 40px rgba(61,43,31,0.10);
+  --shadow-lg: 0 20px 60px rgba(61,43,31,0.15);
 }
 
-* { margin:0; padding:0; box-sizing:border-box; }
-
-html { scroll-behavior: smooth; }
-
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'IBM Plex Mono', monospace;
-  min-height: 100vh;
+  font-family: var(--font-body);
+  background: var(--cream);
+  color: var(--brown);
+  line-height: 1.7;
   overflow-x: hidden;
 }
+img { max-width: 100%; display: block; }
+a { text-decoration: none; color: inherit; }
+ul { list-style: none; }
 
-/* ── Subtle scanline ── */
-body::after {
-  content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
-  background: repeating-linear-gradient(to bottom, transparent 0, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+/* ==============================
+   LOADER
+============================== */
+#loader {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--charcoal);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 24px;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
 }
+#loader.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.loader-logo {
+  font-family: var(--font-display);
+  font-weight: 900; font-size: 2rem;
+  color: var(--orange);
+  letter-spacing: -1px;
+  animation: pulse 1.2s ease infinite;
+}
+.loader-bar {
+  width: 200px; height: 3px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 99px; overflow: hidden;
+}
+.loader-fill {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--orange), var(--orange-light));
+  border-radius: 99px;
+  animation: loadFill 1.8s ease forwards;
+}
+@keyframes loadFill { to { width: 100%; } }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
 
-/* ── Header ── */
-.header {
-  padding: 36px 40px 28px;
-  border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, #0e1620, var(--bg));
+/* ==============================
+   NAVBAR
+============================== */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 0 5%;
+  height: 68px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(247,243,238,0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(196,168,130,0.25);
+  transition: box-shadow 0.3s;
+}
+nav.scrolled { box-shadow: var(--shadow); }
+.nav-logo {
+  font-family: var(--font-display);
+  font-weight: 900; font-size: 1.3rem;
+  color: var(--orange);
+  letter-spacing: -0.5px;
+  display: flex; align-items: center; gap: 8px;
+}
+.nav-logo-icon {
+  width: 32px; height: 32px;
+  background: var(--orange);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 16px;
+}
+.nav-links {
+  display: flex; gap: 32px; align-items: center;
+}
+.nav-links a {
+  font-size: 0.9rem; font-weight: 500;
+  color: var(--brown-mid);
   position: relative;
-  overflow: hidden;
+  transition: color 0.2s;
 }
-.header::before {
-  content:'';
-  position:absolute; top:0; left:0; right:0; height:2px;
-  background: linear-gradient(90deg, transparent, var(--arrow), var(--proc-b), var(--decision-b), transparent);
+.nav-links a::after {
+  content:''; position: absolute; bottom: -3px; left: 0;
+  width: 0; height: 2px; background: var(--orange);
+  border-radius: 2px; transition: width 0.3s;
 }
-.header-top { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; }
-.badge { font-size:9px; letter-spacing:4px; color:var(--arrow); border:1px solid var(--arrow); padding:3px 12px; margin-bottom:12px; display:inline-block; opacity:0.8; }
-h1 {
-  font-family: 'IBM Plex Mono', monospace;
-  font-weight: 700; font-size: clamp(18px, 3vw, 30px);
-  color:#fff; letter-spacing:-0.5px; line-height:1.1;
+.nav-links a:hover { color: var(--orange); }
+.nav-links a:hover::after { width: 100%; }
+.nav-cta {
+  background: var(--orange); color: white !important;
+  padding: 8px 20px; border-radius: 99px;
+  font-weight: 600 !important; font-size: 0.85rem !important;
+  transition: background 0.2s, transform 0.2s !important;
 }
-h1 em { color:var(--arrow); font-style:normal; }
-.header-sub { font-size:11px; color:var(--muted); margin-top:8px; letter-spacing:1px; }
-.legend { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
-.leg { display:flex; align-items:center; gap:7px; font-size:10px; color:var(--muted); }
-.leg-dot { width:10px; height:10px; border-radius:2px; }
+.nav-cta::after { display: none !important; }
+.nav-cta:hover { background: var(--orange-light) !important; transform: translateY(-1px); }
+.hamburger {
+  display: none; flex-direction: column; gap: 5px;
+  cursor: pointer; padding: 4px;
+}
+.hamburger span {
+  display: block; width: 24px; height: 2px;
+  background: var(--brown); border-radius: 2px;
+  transition: all 0.3s;
+}
+.mobile-menu {
+  display: none; position: fixed; inset: 0; z-index: 99;
+  background: var(--warm-white);
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 32px;
+}
+.mobile-menu.open { display: flex; }
+.mobile-menu a {
+  font-family: var(--font-display);
+  font-size: 1.8rem; font-weight: 700;
+  color: var(--brown); transition: color 0.2s;
+}
+.mobile-menu a:hover { color: var(--orange); }
+.mobile-close {
+  position: absolute; top: 24px; right: 5%;
+  font-size: 2rem; cursor: pointer; color: var(--gray);
+  transition: color 0.2s;
+}
+.mobile-close:hover { color: var(--orange); }
 
-/* ── Phase tabs ── */
-.phase-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); overflow-x:auto; }
-.ptab {
-  flex:1; min-width:140px; padding:12px 16px; font-size:10px; letter-spacing:1.5px;
-  text-transform:uppercase; cursor:pointer; border:none; background:transparent;
-  color:var(--muted); border-bottom:2px solid transparent;
-  transition: all 0.25s ease; font-family:'IBM Plex Mono',monospace;
-  white-space:nowrap;
+/* ==============================
+   HERO
+============================== */
+#hero {
+  min-height: 100vh;
+  display: flex; align-items: center;
+  padding: 120px 5% 80px;
+  position: relative; overflow: hidden;
 }
-.ptab:hover { color:var(--text); background:rgba(255,255,255,0.02); }
-.ptab.active { color:#fff; border-bottom-color: var(--arrow); background:rgba(0,212,255,0.04); }
-.ptab .ptab-num { font-size:16px; display:block; margin-bottom:2px; }
-
-/* ── Main layout ── */
-.main { display:grid; grid-template-columns:1fr 340px; min-height:calc(100vh - 200px); }
-
-/* ── Workflow canvas ── */
-.canvas {
-  padding: 32px 28px;
-  position: relative;
-  overflow: hidden;
+.hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(135deg, #2A2420 0%, #3D2B1F 40%, #5C3D2E 70%, #1A1714 100%);
 }
-
-/* Phase sections (shown/hidden) */
-.phase { display:none; }
-.phase.active { display:block; animation: phaseIn 0.35s ease; }
-
-@keyframes phaseIn {
-  from { opacity:0; transform:translateY(10px); }
-  to   { opacity:1; transform:translateY(0); }
+.hero-dots {
+  position: absolute; inset: 0; z-index: 1;
+  background-image: radial-gradient(circle, rgba(232,98,42,0.15) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: dotMove 20s linear infinite;
 }
-
-.phase-title-bar {
-  display:flex; align-items:center; gap:14px;
-  margin-bottom:28px; padding-bottom:14px;
-  border-bottom: 1px solid var(--border);
+@keyframes dotMove { to { background-position: 40px 40px; } }
+.hero-glow {
+  position: absolute; z-index: 1;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(232,98,42,0.25) 0%, transparent 70%);
+  top: -100px; right: -100px;
+  animation: glowFloat 8s ease-in-out infinite;
 }
-.phase-num {
-  width:36px; height:36px; border-radius:8px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:16px; font-weight:700; flex-shrink:0;
+@keyframes glowFloat {
+  0%,100% { transform: translate(0,0) scale(1); }
+  50% { transform: translate(-30px,30px) scale(1.1); }
 }
-.phase-name { font-size:13px; font-weight:600; color:#fff; letter-spacing:0.5px; }
-.phase-duration { font-size:10px; color:var(--muted); margin-top:2px; }
-
-/* ── Step nodes ── */
-.flow {
-  display:flex; flex-direction:column; align-items:center; gap:0;
+.hero-content {
+  position: relative; z-index: 2;
+  max-width: 720px;
 }
-
-.step-row {
-  width:100%; display:flex; flex-direction:column; align-items:center;
-  animation: nodeIn 0.4s ease both;
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(232,98,42,0.2);
+  border: 1px solid rgba(232,98,42,0.4);
+  color: var(--orange-light);
+  padding: 6px 16px; border-radius: 99px;
+  font-size: 0.8rem; font-weight: 500; letter-spacing: 0.5px;
+  margin-bottom: 28px;
+  animation: fadeSlideUp 0.8s ease 0.3s both;
 }
-
-@keyframes nodeIn {
-  from { opacity:0; transform:scale(0.92); }
-  to   { opacity:1; transform:scale(1); }
+.hero-badge::before {
+  content:''; width: 6px; height: 6px;
+  background: var(--orange-light); border-radius: 50%;
+  animation: blink 1.5s ease infinite;
 }
-
-.node {
-  width:100%; max-width:480px;
-  border-radius:10px;
-  padding:14px 18px;
-  border:1px solid;
-  cursor:pointer;
-  position:relative;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  user-select:none;
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 5vw, 4.2rem);
+  font-weight: 900; line-height: 1.1;
+  color: #FDFAF7;
+  letter-spacing: -1.5px;
+  margin-bottom: 20px;
+  animation: fadeSlideUp 0.8s ease 0.5s both;
 }
-.node:hover { transform:translateY(-2px); }
-.node.active-node { outline: 2px solid; outline-offset:3px; }
-
-/* node types */
-.node-input {
-  background: linear-gradient(135deg, #0d2238, #112a42);
-  border-color: var(--input-b);
-  box-shadow: 0 4px 20px rgba(74,158,255,0.12);
+.hero-title span { color: var(--orange); }
+.hero-sub {
+  font-size: 1.15rem; font-weight: 300;
+  color: rgba(253,250,247,0.7);
+  max-width: 540px;
+  margin-bottom: 40px;
+  animation: fadeSlideUp 0.8s ease 0.7s both;
 }
-.node-input.active-node { outline-color: var(--input-b); box-shadow: 0 0 30px rgba(74,158,255,0.25); }
-
-.node-proc {
-  background: linear-gradient(135deg, #0d2418, #102e20);
-  border-color: var(--proc-b);
-  box-shadow: 0 4px 20px rgba(34,201,116,0.10);
+.hero-actions {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  animation: fadeSlideUp 0.8s ease 0.9s both;
 }
-.node-proc.active-node { outline-color: var(--proc-b); box-shadow: 0 0 30px rgba(34,201,116,0.22); }
-
-.node-output {
-  background: linear-gradient(135deg, #2a1a08, #321f0a);
-  border-color: var(--output-b);
-  box-shadow: 0 4px 20px rgba(245,158,34,0.10);
+.btn-primary {
+  background: var(--orange);
+  color: white; font-weight: 600; font-size: 1rem;
+  padding: 14px 32px; border-radius: 99px;
+  display: inline-flex; align-items: center; gap: 10px;
+  transition: all 0.3s; cursor: pointer; border: none;
+  font-family: var(--font-body);
 }
-.node-output.active-node { outline-color: var(--output-b); box-shadow: 0 0 30px rgba(245,158,34,0.22); }
-
-.node-decision {
-  background: linear-gradient(135deg, #200e38, #2a1248);
-  border-color: var(--decision-b);
-  box-shadow: 0 4px 20px rgba(192,96,255,0.10);
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  border-radius:4px;
-  max-width:280px; padding:24px 40px;
-  text-align:center;
+.btn-primary:hover {
+  background: var(--orange-light);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(232,98,42,0.4);
 }
-.node-decision.active-node { outline-color: var(--decision-b); box-shadow: 0 0 30px rgba(192,96,255,0.3); }
-
-/* node internals */
-.node-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-.node-icon { font-size:18px; flex-shrink:0; }
-.node-id { font-size:8px; letter-spacing:2px; color:var(--muted); font-weight:600; }
-.node-label {
-  font-size:12px; font-weight:700; color:#fff; letter-spacing:0.3px;
-  flex:1;
+.btn-outline {
+  background: transparent;
+  color: rgba(253,250,247,0.85); font-weight: 500; font-size: 1rem;
+  padding: 14px 32px; border-radius: 99px;
+  border: 1px solid rgba(253,250,247,0.3);
+  display: inline-flex; align-items: center; gap: 10px;
+  transition: all 0.3s; cursor: pointer; font-family: var(--font-body);
 }
-.node-chips { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
-.chip {
-  font-size:8px; padding:2px 7px; border-radius:3px; font-weight:700; letter-spacing:0.5px;
-  border:1px solid;
+.btn-outline:hover {
+  border-color: rgba(253,250,247,0.7);
+  background: rgba(253,250,247,0.08);
+  transform: translateY(-2px);
 }
-.chip-hw { background:rgba(74,158,255,0.12); color:#4a9eff; border-color:rgba(74,158,255,0.3); }
-.chip-sw { background:rgba(34,201,116,0.12); color:#22c974; border-color:rgba(34,201,116,0.3); }
-.chip-data { background:rgba(245,158,34,0.12); color:#f59e22; border-color:rgba(245,158,34,0.3); }
-.chip-gpio { background:rgba(192,96,255,0.12); color:#c060ff; border-color:rgba(192,96,255,0.3); }
-
-.node-hint { font-size:9px; color:var(--muted); margin-top:6px; letter-spacing:0.5px; }
-
-/* ── Arrows ── */
-.arrow-seg {
-  display:flex; flex-direction:column; align-items:center;
-  padding: 4px 0; gap:0; position:relative;
-  width:100%; max-width:480px;
+.hero-stats {
+  position: relative; z-index: 2;
+  margin-top: 64px;
+  display: flex; gap: 0;
+  animation: fadeSlideUp 0.8s ease 1.1s both;
 }
-.arrow-line {
-  width:2px; background: linear-gradient(to bottom, var(--arrow), rgba(0,212,255,0.3));
-  position:relative; overflow:hidden;
+.hero-stat {
+  padding: 0 40px 0 0;
+  border-right: 1px solid rgba(253,250,247,0.15);
+  margin-right: 40px;
 }
-.arrow-line::after {
-  content:'';
-  position:absolute; top:-100%; left:0; right:0;
-  height:30%; background:rgba(255,255,255,0.5);
-  animation: flowDown 1.8s ease-in-out infinite;
+.hero-stat:last-child { border-right: none; }
+.hero-stat-num {
+  font-family: var(--font-display);
+  font-size: 2.2rem; font-weight: 900;
+  color: var(--orange); letter-spacing: -1px;
 }
-@keyframes flowDown {
-  0%   { top:-30%; opacity:0; }
-  30%  { opacity:1; }
-  100% { top:130%; opacity:0; }
+.hero-stat-label {
+  font-size: 0.8rem; color: rgba(253,250,247,0.5);
+  font-weight: 400; text-transform: uppercase; letter-spacing: 0.5px;
 }
-.arrow-tip { color:var(--arrow); font-size:10px; }
-.arrow-label {
-  font-size:8px; color:var(--muted); letter-spacing:1px; padding:2px 8px;
-  background:rgba(0,212,255,0.06); border-radius:3px;
-  border: 1px solid rgba(0,212,255,0.15);
-  margin: 2px 0;
+.hero-visual {
+  position: absolute; z-index: 2;
+  right: 5%; top: 50%; transform: translateY(-50%);
+  width: min(420px, 40%);
+  animation: fadeIn 1.2s ease 1s both;
 }
-
-/* decision branches */
-.branch-row {
-  width:100%; display:flex; justify-content:center; gap:20px;
-  margin:8px 0;
+.hero-card {
+  background: rgba(253,250,247,0.06);
+  border: 1px solid rgba(253,250,247,0.1);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  backdrop-filter: blur(12px);
 }
-.branch {
-  flex:1; max-width:220px;
-  display:flex; flex-direction:column; align-items:center; gap:0;
+.hero-card-title {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--sand); margin-bottom: 16px; font-weight: 500;
 }
-.branch-label-yes { font-size:9px; color:var(--yes-c); letter-spacing:1px; margin-bottom:4px; font-weight:700; }
-.branch-label-no  { font-size:9px; color:var(--no-c);  letter-spacing:1px; margin-bottom:4px; font-weight:700; }
-.branch-line-yes { width:2px; background:linear-gradient(to bottom, var(--yes-c), rgba(34,201,116,0.2)); }
-.branch-line-no  { width:2px; background:linear-gradient(to bottom, var(--no-c),  rgba(255,68,68,0.2)); }
-
-/* ── Detail panel ── */
-.detail-panel {
-  background: var(--surface);
-  border-left: 1px solid var(--border);
-  padding: 28px 22px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-  transition: background 0.3s ease;
+.sensor-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
 }
-
-.detail-empty {
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  height:100%; gap:14px; text-align:center;
+.sensor-item {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px; padding: 14px;
+  transition: all 0.3s;
 }
-.detail-empty-icon { font-size:36px; opacity:0.3; }
-.detail-empty-text { font-size:11px; color:var(--muted); line-height:1.6; }
-
-.detail-content { display:none; }
-.detail-content.visible { display:block; animation: detailIn 0.3s ease; }
-
-@keyframes detailIn {
-  from { opacity:0; transform:translateX(8px); }
-  to   { opacity:1; transform:translateX(0); }
+.sensor-item:hover {
+  background: rgba(232,98,42,0.1);
+  border-color: rgba(232,98,42,0.3);
+}
+.sensor-icon { font-size: 1.5rem; margin-bottom: 6px; }
+.sensor-name { font-size: 0.7rem; color: rgba(253,250,247,0.5); }
+.sensor-val {
+  font-family: var(--font-display);
+  font-size: 1.1rem; font-weight: 700; color: var(--orange-light);
+}
+.sensor-status {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 16px; padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  font-size: 0.78rem; color: rgba(253,250,247,0.6);
+}
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green-accent);
+  animation: blink 2s ease infinite;
 }
 
-.detail-type-badge {
-  display:inline-block; font-size:8px; letter-spacing:3px; text-transform:uppercase;
-  padding:3px 10px; border-radius:3px; margin-bottom:14px; font-weight:700;
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.dt-input    { background:rgba(74,158,255,0.12);   color:var(--input-b);    border:1px solid rgba(74,158,255,0.3); }
-.dt-proc     { background:rgba(34,201,116,0.12);   color:var(--proc-b);     border:1px solid rgba(34,201,116,0.3); }
-.dt-output   { background:rgba(245,158,34,0.12);   color:var(--output-b);   border:1px solid rgba(245,158,34,0.3); }
-.dt-decision { background:rgba(192,96,255,0.12);   color:var(--decision-b); border:1px solid rgba(192,96,255,0.3); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.detail-title { font-size:16px; font-weight:700; color:#fff; margin-bottom:6px; line-height:1.2; }
-.detail-desc  { font-size:11px; color:#8aaccc; line-height:1.7; margin-bottom:18px; }
-
-.detail-section { margin-bottom:16px; }
-.detail-section-title {
-  font-size:9px; letter-spacing:2px; text-transform:uppercase;
-  color:var(--muted); margin-bottom:8px; padding-bottom:4px;
-  border-bottom:1px solid var(--border);
+/* ==============================
+   SECTIONS COMMONS
+============================== */
+section { padding: 100px 5%; }
+.section-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.78rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--orange); margin-bottom: 16px;
 }
-.detail-item {
-  display:flex; align-items:flex-start; gap:8px;
-  font-size:10px; color:#7aaabb; line-height:1.5;
-  margin-bottom:6px; padding:6px 8px;
-  background:rgba(255,255,255,0.02); border-radius:5px;
-  border:1px solid rgba(255,255,255,0.04);
+.section-label::before {
+  content: ''; width: 20px; height: 2px;
+  background: var(--orange); border-radius: 2px;
 }
-.detail-item-icon { flex-shrink:0; font-size:12px; }
-.detail-code {
-  font-size:10px; color:#a0e8a0; background:rgba(0,0,0,0.4);
-  border:1px solid rgba(34,201,116,0.2); border-radius:5px;
-  padding:10px 12px; margin-top:8px; line-height:1.6;
-  white-space:pre-wrap; overflow-x:auto;
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 900; letter-spacing: -1px;
+  line-height: 1.15; color: var(--charcoal);
+  margin-bottom: 16px;
 }
-.detail-gpio {
-  display:inline-block; font-size:9px; font-weight:700;
-  background:rgba(192,96,255,0.15); color:#c060ff;
-  border:1px solid rgba(192,96,255,0.3); border-radius:3px;
-  padding:1px 7px; margin:2px 2px 0 0;
+.section-desc {
+  font-size: 1.05rem; color: var(--brown-mid);
+  max-width: 560px; line-height: 1.8;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width:4px; height:4px; }
-::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:var(--border2); border-radius:4px; }
+/* REVEAL ANIMATIONS */
+.reveal {
+  opacity: 0; transform: translateY(32px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal-left {
+  opacity: 0; transform: translateX(-32px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal-left.visible { opacity: 1; transform: translateX(0); }
+.reveal-right {
+  opacity: 0; transform: translateX(32px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal-right.visible { opacity: 1; transform: translateX(0); }
 
-/* ── Responsive ── */
-@media(max-width:760px) {
-  .main { grid-template-columns:1fr; }
-  .detail-panel { height:auto; position:relative; border-left:none; border-top:1px solid var(--border); }
+/* ==============================
+   SECTION PRÉSENTATION
+============================== */
+#presentation { background: var(--warm-white); }
+.pres-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 80px; align-items: center; margin-top: 60px;
+}
+.pres-desc {
+  font-size: 1.05rem; color: var(--brown-mid);
+  line-height: 1.85; margin-bottom: 32px;
+}
+.pres-objectives {
+  display: flex; flex-direction: column; gap: 16px;
+}
+.obj-item {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 18px 20px; border-radius: var(--radius);
+  background: var(--cream);
+  border: 1px solid var(--sand-light);
+  transition: all 0.3s; cursor: default;
+}
+.obj-item:hover {
+  border-color: var(--orange);
+  background: var(--orange-pale);
+  transform: translateX(4px);
+  box-shadow: var(--shadow);
+}
+.obj-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: var(--orange-pale);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; flex-shrink: 0;
+  transition: background 0.3s;
+}
+.obj-item:hover .obj-icon { background: var(--orange); }
+.obj-title {
+  font-weight: 600; font-size: 0.95rem;
+  color: var(--charcoal); margin-bottom: 4px;
+}
+.obj-text { font-size: 0.85rem; color: var(--gray); }
+.pres-visual-side {
+  display: flex; flex-direction: column; gap: 20px;
+}
+.arch-card {
+  background: var(--charcoal); border-radius: var(--radius-lg);
+  padding: 32px; color: white; position: relative; overflow: hidden;
+}
+.arch-card::before {
+  content: ''; position: absolute;
+  top: -40px; right: -40px;
+  width: 160px; height: 160px;
+  background: radial-gradient(circle, rgba(232,98,42,0.3) 0%, transparent 70%);
+}
+.arch-title {
+  font-family: var(--font-display);
+  font-size: 1rem; font-weight: 700;
+  color: var(--orange); margin-bottom: 20px;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.arch-layers {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.arch-layer {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: 10px;
+  font-size: 0.85rem; font-weight: 500;
+  transition: all 0.3s;
+}
+.arch-layer:hover { transform: translateX(4px); }
+.arch-layer.l1 { background: rgba(232,98,42,0.2); border-left: 3px solid var(--orange); }
+.arch-layer.l2 { background: rgba(58,123,213,0.2); border-left: 3px solid var(--blue-accent); }
+.arch-layer.l3 { background: rgba(76,175,122,0.2); border-left: 3px solid var(--green-accent); }
+.arch-layer-icon { font-size: 1.1rem; }
+.arch-arrow {
+  text-align: center; color: rgba(255,255,255,0.3);
+  font-size: 1.2rem; padding: 2px 0;
+}
+.stats-mini {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 12px;
+}
+.stat-mini-card {
+  background: var(--cream); border: 1px solid var(--sand-light);
+  border-radius: var(--radius); padding: 20px 16px; text-align: center;
+  transition: all 0.3s;
+}
+.stat-mini-card:hover {
+  border-color: var(--orange);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+.stat-mini-num {
+  font-family: var(--font-display);
+  font-size: 1.6rem; font-weight: 900;
+  color: var(--orange); letter-spacing: -1px;
+}
+.stat-mini-label { font-size: 0.72rem; color: var(--gray); margin-top: 2px; }
+
+/* ==============================
+   SECTION TINYML
+============================== */
+#tinyml { background: var(--cream); }
+.models-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 24px; margin-top: 60px; margin-bottom: 60px;
+}
+.model-card {
+  background: var(--warm-white);
+  border: 1px solid var(--sand-light);
+  border-radius: var(--radius-lg); padding: 32px;
+  cursor: pointer; transition: all 0.35s;
+  position: relative; overflow: hidden;
+}
+.model-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent 60%, rgba(232,98,42,0.05));
+  opacity: 0; transition: opacity 0.3s;
+}
+.model-card:hover {
+  border-color: var(--orange);
+  transform: translateY(-8px);
+  box-shadow: 0 20px 48px rgba(232,98,42,0.15);
+}
+.model-card:hover::before { opacity: 1; }
+.model-badge {
+  display: inline-block; padding: 4px 14px;
+  border-radius: 99px; font-size: 0.72rem;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 20px;
+}
+.badge-green { background: rgba(76,175,122,0.15); color: var(--green-accent); }
+.badge-blue { background: rgba(58,123,213,0.15); color: var(--blue-accent); }
+.badge-orange { background: rgba(232,98,42,0.15); color: var(--orange); }
+.model-icon { font-size: 2.5rem; margin-bottom: 16px; }
+.model-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem; font-weight: 700;
+  color: var(--charcoal); margin-bottom: 8px;
+}
+.model-desc { font-size: 0.88rem; color: var(--gray); line-height: 1.7; margin-bottom: 24px; }
+.model-metrics { display: flex; flex-direction: column; gap: 10px; }
+.metric-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.83rem;
+}
+.metric-label { color: var(--gray); }
+.metric-bar {
+  flex: 1; height: 4px; background: var(--sand-light);
+  border-radius: 2px; margin: 0 12px; overflow: hidden;
+}
+.metric-fill {
+  height: 100%; border-radius: 2px;
+  background: linear-gradient(90deg, var(--orange), var(--orange-light));
+  width: 0; transition: width 1s ease 0.3s;
+}
+.metric-val { font-weight: 600; color: var(--charcoal); min-width: 45px; text-align: right; }
+
+/* Comparison Table */
+.comp-table-wrap {
+  background: var(--warm-white);
+  border: 1px solid var(--sand-light);
+  border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.comp-table {
+  width: 100%; border-collapse: collapse;
+}
+.comp-table th {
+  background: var(--charcoal); color: rgba(253,250,247,0.9);
+  font-size: 0.82rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 16px 20px; text-align: left;
+}
+.comp-table th:first-child { width: 35%; }
+.comp-table td {
+  padding: 16px 20px; font-size: 0.9rem; color: var(--brown);
+  border-bottom: 1px solid var(--sand-light);
+  transition: background 0.2s;
+}
+.comp-table tr:last-child td { border-bottom: none; }
+.comp-table tr:hover td { background: var(--orange-pale); }
+.comp-table td:first-child { font-weight: 600; color: var(--charcoal); }
+.best-badge {
+  display: inline-block; background: rgba(76,175,122,0.15);
+  color: var(--green-accent); font-size: 0.7rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 99px; margin-left: 6px;
+}
+
+/* Energy Chart */
+.energy-section { margin-top: 60px; }
+.energy-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem; font-weight: 700;
+  color: var(--charcoal); margin-bottom: 32px;
+  display: flex; align-items: center; gap: 12px;
+}
+.energy-chart {
+  display: flex; align-items: flex-end; gap: 20px;
+  height: 200px; padding: 0 0 0 40px; position: relative;
+}
+.chart-y-axis {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  display: flex; flex-direction: column;
+  justify-content: space-between; width: 36px;
+}
+.y-label {
+  font-size: 0.72rem; color: var(--gray);
+  text-align: right; padding-right: 8px;
+}
+.chart-bars {
+  display: flex; align-items: flex-end; gap: 32px;
+  flex: 1; position: relative;
+}
+.chart-bars::before {
+  content:''; position: absolute;
+  left:0; right:0; top:0; bottom:0;
+  background: repeating-linear-gradient(
+    to bottom, transparent, transparent calc(25% - 1px),
+    var(--sand-light) calc(25%), transparent calc(25% + 1px)
+  );
+}
+.bar-group { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; position: relative; }
+.bar-wrap { flex: 1; display: flex; align-items: flex-end; width: 100%; }
+.bar {
+  width: 100%; border-radius: 8px 8px 0 0;
+  height: 0; transition: height 1.2s cubic-bezier(0.34,1.56,0.64,1);
+  position: relative; cursor: pointer;
+}
+.bar::after {
+  content: attr(data-val);
+  position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
+  background: var(--charcoal); color: white;
+  font-size: 0.75rem; font-weight: 600;
+  padding: 3px 8px; border-radius: 6px;
+  opacity: 0; transition: opacity 0.2s;
+  white-space: nowrap;
+}
+.bar:hover::after { opacity: 1; }
+.bar.green { background: linear-gradient(to top, #2E7D5E, var(--green-accent)); }
+.bar.blue { background: linear-gradient(to top, #2557A7, var(--blue-accent)); }
+.bar.orange { background: linear-gradient(to top, #C0491A, var(--orange)); }
+.bar-label {
+  font-size: 0.8rem; font-weight: 600; color: var(--brown-mid);
+  text-align: center; white-space: nowrap;
+}
+
+/* ==============================
+   SECTION TRANSMISSION
+============================== */
+#transmission { background: var(--charcoal); color: white; }
+#transmission .section-title { color: var(--warm-white); }
+#transmission .section-desc { color: rgba(253,250,247,0.6); }
+.trans-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 24px; margin-top: 60px; margin-bottom: 60px;
+}
+.trans-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-lg); padding: 32px;
+  transition: all 0.35s; cursor: pointer;
+  position: relative; overflow: hidden;
+}
+.trans-card::after {
+  content: ''; position: absolute;
+  bottom: 0; left: 0; right: 0; height: 3px;
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 0.3s;
+}
+.trans-card.cont::after { background: var(--green-accent); }
+.trans-card.peri::after { background: var(--blue-accent); }
+.trans-card.evnt::after { background: var(--orange); }
+.trans-card:hover {
+  background: rgba(255,255,255,0.07);
+  transform: translateY(-6px);
+  border-color: rgba(255,255,255,0.18);
+}
+.trans-card:hover::after { transform: scaleX(1); }
+.trans-icon { font-size: 2.4rem; margin-bottom: 20px; }
+.trans-name {
+  font-family: var(--font-display);
+  font-size: 1.2rem; font-weight: 700;
+  color: var(--warm-white); margin-bottom: 10px;
+}
+.trans-desc { font-size: 0.87rem; color: rgba(253,250,247,0.55); line-height: 1.7; margin-bottom: 24px; }
+.trans-metrics { display: flex; flex-direction: column; gap: 8px; }
+.trans-metric {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.82rem;
+}
+.trans-metric-label { color: rgba(253,250,247,0.5); }
+.trans-metric-val { font-weight: 600; }
+.val-green { color: var(--green-accent); }
+.val-blue { color: #6BAEE8; }
+.val-orange { color: var(--orange-light); }
+.val-red { color: #E87070; }
+
+/* Transmission Bar Chart */
+.trans-chart-wrap {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: var(--radius-lg); padding: 40px;
+}
+.trans-chart-title {
+  font-family: var(--font-display);
+  font-size: 1rem; font-weight: 600;
+  color: var(--warm-white); margin-bottom: 32px;
+  display: flex; align-items: center; gap: 10px;
+}
+.trans-bars { display: flex; flex-direction: column; gap: 20px; }
+.trans-bar-row { display: flex; align-items: center; gap: 16px; }
+.trans-bar-name {
+  width: 140px; font-size: 0.85rem;
+  color: rgba(253,250,247,0.7); font-weight: 500; flex-shrink: 0;
+}
+.trans-bar-track {
+  flex: 1; height: 10px; background: rgba(255,255,255,0.07);
+  border-radius: 5px; overflow: hidden;
+}
+.trans-bar-fill {
+  height: 100%; border-radius: 5px; width: 0;
+  transition: width 1.2s cubic-bezier(0.34,1.56,0.64,1);
+}
+.trans-bar-num { font-size: 0.85rem; font-weight: 700; min-width: 60px; text-align: right; }
+
+/* ==============================
+   SECTION DASHBOARD
+============================== */
+#dashboard { background: var(--warm-white); }
+.dash-grid {
+  display: grid; grid-template-columns: 1.3fr 1fr;
+  gap: 60px; align-items: start; margin-top: 60px;
+}
+.dash-mockup {
+  background: var(--charcoal); border-radius: 20px;
+  overflow: hidden; box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.dash-bar {
+  background: rgba(255,255,255,0.05);
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.dash-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.dash-title-bar {
+  flex: 1; text-align: center;
+  font-size: 0.78rem; color: rgba(255,255,255,0.4);
+}
+.dash-body { padding: 24px; }
+.dash-kpi-row {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 20px;
+}
+.kpi-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px; padding: 16px;
+}
+.kpi-label { font-size: 0.7rem; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+.kpi-val {
+  font-family: var(--font-display);
+  font-size: 1.5rem; font-weight: 800; color: var(--warm-white);
+  letter-spacing: -0.5px;
+}
+.kpi-unit { font-size: 0.75rem; color: var(--orange-light); margin-left: 3px; }
+.dash-chart-area {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px; padding: 16px; height: 110px;
+  position: relative; overflow: hidden; margin-bottom: 20px;
+}
+.chart-line {
+  position: absolute; bottom: 16px; left: 16px; right: 16px; top: 16px;
+}
+.mini-chart-svg { width: 100%; height: 100%; overflow: visible; }
+.alert-panel { display: flex; flex-direction: column; gap: 8px; }
+.alert-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 0.78rem;
+}
+.alert-item.active {
+  background: rgba(232,98,42,0.15);
+  border: 1px solid rgba(232,98,42,0.3);
+  color: var(--orange-light);
+  animation: alertPulse 2s ease infinite;
+}
+.alert-item.ok {
+  background: rgba(76,175,122,0.1);
+  border: 1px solid rgba(76,175,122,0.2);
+  color: #7ECFA0;
+}
+@keyframes alertPulse {
+  0%,100% { border-color: rgba(232,98,42,0.3); }
+  50% { border-color: rgba(232,98,42,0.7); }
+}
+.alert-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  animation: blink 1.5s ease infinite;
+}
+.dash-right { }
+.dash-features { display: flex; flex-direction: column; gap: 24px; }
+.dash-feat {
+  display: flex; gap: 16px; align-items: flex-start;
+  padding: 20px; border-radius: var(--radius);
+  border: 1px solid var(--sand-light);
+  background: var(--cream);
+  transition: all 0.3s;
+}
+.dash-feat:hover {
+  border-color: var(--orange);
+  background: var(--orange-pale);
+  transform: translateX(4px);
+}
+.dash-feat-icon {
+  width: 48px; height: 48px; flex-shrink: 0;
+  background: var(--orange-pale);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem;
+  transition: background 0.3s;
+}
+.dash-feat:hover .dash-feat-icon { background: var(--orange); }
+.dash-feat-title { font-weight: 600; font-size: 0.95rem; color: var(--charcoal); margin-bottom: 4px; }
+.dash-feat-desc { font-size: 0.83rem; color: var(--gray); line-height: 1.6; }
+
+/* ==============================
+   SECTION RÉSULTATS
+============================== */
+#resultats { background: var(--cream); }
+.results-header { max-width: 600px; }
+.metrics-grid {
+  display: grid; grid-template-columns: repeat(5,1fr);
+  gap: 16px; margin-top: 60px; margin-bottom: 60px;
+}
+.metric-card {
+  background: var(--warm-white);
+  border: 1px solid var(--sand-light);
+  border-radius: var(--radius-lg); padding: 28px 20px;
+  text-align: center; transition: all 0.3s;
+  position: relative; overflow: hidden;
+}
+.metric-card::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 3px;
+  background: var(--orange);
+}
+.metric-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--orange);
+}
+.metric-icon { font-size: 2rem; margin-bottom: 12px; }
+.metric-num {
+  font-family: var(--font-display);
+  font-size: 2rem; font-weight: 900;
+  color: var(--orange); letter-spacing: -1px;
+  line-height: 1;
+}
+.metric-unit { font-size: 0.9rem; color: var(--sand); }
+.metric-name { font-size: 0.78rem; color: var(--gray); margin-top: 6px; font-weight: 500; }
+
+/* Benchmark Chart */
+.bench-section {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+  margin-bottom: 60px;
+}
+.bench-card {
+  background: var(--warm-white);
+  border: 1px solid var(--sand-light);
+  border-radius: var(--radius-lg); padding: 32px;
+  box-shadow: var(--shadow);
+}
+.bench-card-title {
+  font-family: var(--font-display);
+  font-size: 1rem; font-weight: 700;
+  color: var(--charcoal); margin-bottom: 24px;
+  display: flex; align-items: center; gap: 10px;
+}
+.bench-bars { display: flex; flex-direction: column; gap: 16px; }
+.bench-bar-row { display: flex; flex-direction: column; gap: 6px; }
+.bench-bar-info { display: flex; justify-content: space-between; font-size: 0.82rem; }
+.bench-bar-label { color: var(--brown-mid); font-weight: 500; }
+.bench-bar-val { color: var(--charcoal); font-weight: 700; }
+.bench-track {
+  height: 8px; background: var(--sand-light);
+  border-radius: 4px; overflow: hidden;
+}
+.bench-fill {
+  height: 100%; border-radius: 4px;
+  width: 0; transition: width 1.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.conclusions {
+  background: var(--charcoal); border-radius: var(--radius-lg);
+  padding: 48px; color: white;
+  display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center;
+}
+.concl-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem; font-weight: 800;
+  color: var(--warm-white); margin-bottom: 16px;
+}
+.concl-text { font-size: 0.93rem; color: rgba(253,250,247,0.65); line-height: 1.8; }
+.concl-points {
+  display: flex; flex-direction: column; gap: 10px; margin-top: 20px;
+}
+.concl-point {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.88rem; color: rgba(253,250,247,0.8);
+}
+.concl-point::before {
+  content: '✓'; width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(76,175,122,0.2); color: var(--green-accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+}
+.btn-download {
+  background: var(--orange); color: white; font-weight: 600; font-size: 0.95rem;
+  padding: 16px 32px; border-radius: 14px;
+  display: inline-flex; align-items: center; gap: 12px;
+  transition: all 0.3s; cursor: pointer; border: none;
+  font-family: var(--font-body);
+  white-space: nowrap; flex-shrink: 0;
+}
+.btn-download:hover {
+  background: var(--orange-light);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(232,98,42,0.4);
+}
+
+/* ==============================
+   FOOTER
+============================== */
+footer {
+  background: var(--brown);
+  color: rgba(253,250,247,0.7);
+  padding: 80px 5% 40px;
+}
+.footer-grid {
+  display: grid; grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 60px; margin-bottom: 60px;
+}
+.footer-brand { }
+.footer-logo {
+  font-family: var(--font-display);
+  font-size: 1.5rem; font-weight: 900;
+  color: var(--warm-white); letter-spacing: -0.5px;
+  margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+}
+.footer-logo-icon {
+  width: 36px; height: 36px; background: var(--orange);
+  border-radius: 9px; display: flex; align-items: center;
+  justify-content: center; color: white; font-size: 18px;
+}
+.footer-brand-desc {
+  font-size: 0.88rem; line-height: 1.7; max-width: 300px;
+  color: rgba(253,250,247,0.55);
+}
+.footer-col-title {
+  font-weight: 700; font-size: 0.85rem;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  color: var(--warm-white); margin-bottom: 20px;
+}
+.footer-links { display: flex; flex-direction: column; gap: 12px; }
+.footer-links a {
+  font-size: 0.87rem; color: rgba(253,250,247,0.55);
+  transition: color 0.2s;
+}
+.footer-links a:hover { color: var(--orange-light); }
+.footer-contact { display: flex; flex-direction: column; gap: 14px; }
+.contact-item {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 0.87rem; color: rgba(253,250,247,0.55);
+}
+.contact-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: rgba(255,255,255,0.07);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0;
+}
+.footer-divider {
+  height: 1px; background: rgba(255,255,255,0.08);
+  margin-bottom: 32px;
+}
+.footer-bottom {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.82rem; color: rgba(253,250,247,0.35);
+}
+.footer-socials { display: flex; gap: 12px; }
+.social-btn {
+  width: 36px; height: 36px; border-radius: 9px;
+  background: rgba(255,255,255,0.07);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; cursor: pointer; transition: all 0.2s;
+  color: rgba(253,250,247,0.55);
+}
+.social-btn:hover {
+  background: var(--orange);
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* ==============================
+   BACK TO TOP
+============================== */
+#backToTop {
+  position: fixed; bottom: 32px; right: 32px; z-index: 98;
+  width: 48px; height: 48px; border-radius: 12px;
+  background: var(--orange); color: white;
+  border: none; cursor: pointer; font-size: 1.3rem;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(232,98,42,0.4);
+  opacity: 0; visibility: hidden;
+  transform: translateY(12px);
+  transition: all 0.3s;
+}
+#backToTop.visible { opacity: 1; visibility: visible; transform: translateY(0); }
+#backToTop:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(232,98,42,0.5); }
+
+/* ==============================
+   RESPONSIVE
+============================== */
+@media (max-width: 1100px) {
+  .models-grid { grid-template-columns: 1fr 1fr; }
+  .metrics-grid { grid-template-columns: repeat(3,1fr); }
+  .bench-section { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .hamburger { display: flex; }
+  .hero-visual { display: none; }
+  .pres-grid { grid-template-columns: 1fr; gap: 48px; }
+  .trans-grid { grid-template-columns: 1fr; }
+  .dash-grid { grid-template-columns: 1fr; }
+  .conclusions { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: 1fr; gap: 40px; }
+  .footer-bottom { flex-direction: column; gap: 16px; }
+}
+@media (max-width: 600px) {
+  section { padding: 72px 6%; }
+  .models-grid { grid-template-columns: 1fr; }
+  .metrics-grid { grid-template-columns: repeat(2,1fr); }
+  .hero-stats { flex-direction: column; gap: 20px; }
+  .hero-stat { border-right: none; }
+  .dash-kpi-row { grid-template-columns: 1fr 1fr; }
+  .stats-mini { grid-template-columns: repeat(3,1fr); }
 }
 </style>
 </head>
 <body>
 
-<!-- Header -->
-<div class="header">
-  <div class="header-top">
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-logo">⚡ IoT Edge Monitor</div>
+  <div class="loader-bar"><div class="loader-fill"></div></div>
+</div>
+
+<!-- NAVBAR -->
+<nav id="navbar">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">⚡</div>
+    IoT Edge Monitor
+  </div>
+  <ul class="nav-links">
+    <li><a href="#presentation">Projet</a></li>
+    <li><a href="#tinyml">TinyML</a></li>
+    <li><a href="#transmission">Transmission</a></li>
+    <li><a href="#dashboard">Dashboard</a></li>
+    <li><a href="#resultats">Résultats</a></li>
+    <li><a href="#contact" class="nav-cta">Contact</a></li>
+  </ul>
+  <div class="hamburger" id="hamburger" onclick="toggleMenu()">
+    <span></span><span></span><span></span>
+  </div>
+</nav>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobileMenu">
+  <span class="mobile-close" onclick="toggleMenu()">✕</span>
+  <a href="#presentation" onclick="toggleMenu()">Projet</a>
+  <a href="#tinyml" onclick="toggleMenu()">TinyML</a>
+  <a href="#transmission" onclick="toggleMenu()">Transmission</a>
+  <a href="#dashboard" onclick="toggleMenu()">Dashboard</a>
+  <a href="#resultats" onclick="toggleMenu()">Résultats</a>
+  <a href="#contact" onclick="toggleMenu()">Contact</a>
+</div>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-dots"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <div class="hero-badge">IoT · Edge Computing · TinyML</div>
+    <h1 class="hero-title">
+      Surveillance d'accès &<br>détection de <span>présence</span><br>avec TinyML
+    </h1>
+    <p class="hero-sub">Un système IoT optimisé pour le Edge computing — intelligence embarquée, faible consommation, haute réactivité.</p>
+    <div class="hero-actions">
+      <a href="#presentation" class="btn-primary">🔍 Découvrir le projet</a>
+      <a href="#resultats" class="btn-outline">📊 Voir les résultats</a>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-num">98%</div>
+        <div class="hero-stat-label">Précision max</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">3</div>
+        <div class="hero-stat-label">Modèles TinyML</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">72%</div>
+        <div class="hero-stat-label">Énergie épargnée</div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="hero-card">
+      <div class="hero-card-title">📡 Capteurs en temps réel</div>
+      <div class="sensor-grid">
+        <div class="sensor-item">
+          <div class="sensor-icon">🚶</div>
+          <div class="sensor-name">Présence</div>
+          <div class="sensor-val">Détectée</div>
+        </div>
+        <div class="sensor-item">
+          <div class="sensor-icon">🔐</div>
+          <div class="sensor-name">Accès</div>
+          <div class="sensor-val">Autorisé</div>
+        </div>
+        <div class="sensor-item">
+          <div class="sensor-icon">🌡️</div>
+          <div class="sensor-name">Temp.</div>
+          <div class="sensor-val">23.4°C</div>
+        </div>
+        <div class="sensor-item">
+          <div class="sensor-icon">⚡</div>
+          <div class="sensor-name">Énergie</div>
+          <div class="sensor-val">4.2 mAh</div>
+        </div>
+      </div>
+      <div class="sensor-status">
+        <div class="status-dot"></div>
+        Système actif — Edge node connecté
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRÉSENTATION -->
+<section id="presentation">
+  <div class="section-label">Présentation</div>
+  <h2 class="section-title reveal">Un système IoT<br>intelligent au cœur du Edge</h2>
+  <div class="pres-grid">
+    <div class="reveal-left">
+      <p class="pres-desc">Ce projet déploie un système de surveillance d'accès et de détection de présence basé sur des modèles TinyML embarqués sur des microcontrôleurs à ressources limitées. L'intelligence est traitée localement sur le nœud Edge, garantissant latence minimale, confidentialité des données et efficacité énergétique.</p>
+      <div class="pres-objectives">
+        <div class="obj-item">
+          <div class="obj-icon">🧠</div>
+          <div>
+            <div class="obj-title">Inférence embarquée</div>
+            <div class="obj-text">Détection de présence via modèles TinyML optimisés pour microcontrôleurs (≤ 50 KB RAM)</div>
+          </div>
+        </div>
+        <div class="obj-item">
+          <div class="obj-icon">📡</div>
+          <div>
+            <div class="obj-title">Transmission intelligente</div>
+            <div class="obj-text">Stratégies adaptatives — continue, périodique et event-driven — selon le contexte</div>
+          </div>
+        </div>
+        <div class="obj-item">
+          <div class="obj-icon">⚡</div>
+          <div>
+            <div class="obj-title">Optimisation énergétique</div>
+            <div class="obj-text">Réduction jusqu'à 72% de la consommation vs transmission continue naïve</div>
+          </div>
+        </div>
+        <div class="obj-item">
+          <div class="obj-icon">📊</div>
+          <div>
+            <div class="obj-title">Dashboard & alertes</div>
+            <div class="obj-text">Visualisation temps réel, notifications automatiques, historique des événements</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="reveal-right">
+      <div class="arch-card">
+        <div class="arch-title">🏗️ Architecture 3 couches</div>
+        <div class="arch-layers">
+          <div class="arch-layer l1">
+            <div class="arch-layer-icon">📟</div>
+            <div><strong>Couche Edge</strong> — Capteurs + microcontrôleur + inférence TinyML</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer l2">
+            <div class="arch-layer-icon">🌐</div>
+            <div><strong>Couche Réseau</strong> — MQTT/LoRa · protocole event-driven</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer l3">
+            <div class="arch-layer-icon">☁️</div>
+            <div><strong>Couche Application</strong> — Dashboard · alertes · API REST</div>
+          </div>
+        </div>
+      </div>
+      <div class="stats-mini" style="margin-top:20px;">
+        <div class="stat-mini-card">
+          <div class="stat-mini-num">3</div>
+          <div class="stat-mini-label">Modèles ML</div>
+        </div>
+        <div class="stat-mini-card">
+          <div class="stat-mini-num">50KB</div>
+          <div class="stat-mini-label">RAM max</div>
+        </div>
+        <div class="stat-mini-card">
+          <div class="stat-mini-num">12ms</div>
+          <div class="stat-mini-label">Latence</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TINYML -->
+<section id="tinyml">
+  <div class="section-label">TinyML</div>
+  <h2 class="section-title reveal">Trois modèles d'inférence<br>embarqués</h2>
+  <p class="section-desc reveal">Chaque modèle offre un compromis différent entre précision, consommation mémoire et vitesse d'inférence — adaptés aux contraintes du Edge.</p>
+
+  <div class="models-grid">
+    <div class="model-card reveal" style="transition-delay:0.1s">
+      <div class="model-badge badge-green">Optimal</div>
+      <div class="model-icon">📏</div>
+      <div class="model-name">Threshold</div>
+      <p class="model-desc">Détection basée sur un seuil fixe. Extrêmement léger, idéal pour les contraintes matérielles les plus sévères et une consommation quasi nulle.</p>
+      <div class="model-metrics">
+        <div class="metric-row">
+          <span class="metric-label">Précision</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="72"></div></div>
+          <span class="metric-val">72%</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">RAM</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="8"></div></div>
+          <span class="metric-val">2 KB</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Temps inf.</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="10"></div></div>
+          <span class="metric-val">1 ms</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Énergie</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="5"></div></div>
+          <span class="metric-val">0.8 mJ</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="model-card reveal" style="transition-delay:0.2s">
+      <div class="model-badge badge-blue">Équilibré</div>
+      <div class="model-icon">📈</div>
+      <div class="model-name">Logistic Regression</div>
+      <p class="model-desc">Modèle linéaire probabiliste. Bon compromis précision/ressources, interprétable et robuste aux variations de signal.</p>
+      <div class="model-metrics">
+        <div class="metric-row">
+          <span class="metric-label">Précision</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="90"></div></div>
+          <span class="metric-val">90%</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">RAM</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="18"></div></div>
+          <span class="metric-val">8 KB</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Temps inf.</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="35"></div></div>
+          <span class="metric-val">5 ms</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Énergie</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="22"></div></div>
+          <span class="metric-val">3.2 mJ</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="model-card reveal" style="transition-delay:0.3s">
+      <div class="model-badge badge-orange">Précis</div>
+      <div class="model-icon">🌳</div>
+      <div class="model-name">Decision Tree</div>
+      <p class="model-desc">Arbre de décision optimisé. Meilleure précision du trio, légèrement plus gourmand mais toujours adapté au Edge.</p>
+      <div class="model-metrics">
+        <div class="metric-row">
+          <span class="metric-label">Précision</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="98"></div></div>
+          <span class="metric-val">98%</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">RAM</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="60"></div></div>
+          <span class="metric-val">24 KB</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Temps inf.</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="80"></div></div>
+          <span class="metric-val">12 ms</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Énergie</span>
+          <div class="metric-bar"><div class="metric-fill" data-w="55"></div></div>
+          <span class="metric-val">8.1 mJ</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comparison Table -->
+  <div class="comp-table-wrap reveal">
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Modèle</th>
+          <th>Précision</th>
+          <th>RAM utilisée</th>
+          <th>Temps d'inférence</th>
+          <th>Énergie / inférence</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>📏 Threshold</td>
+          <td>72%</td>
+          <td>2 KB <span class="best-badge">Best</span></td>
+          <td>1 ms <span class="best-badge">Best</span></td>
+          <td>0.8 mJ <span class="best-badge">Best</span></td>
+        </tr>
+        <tr>
+          <td>📈 Logistic Regression</td>
+          <td>90%</td>
+          <td>8 KB</td>
+          <td>5 ms</td>
+          <td>3.2 mJ</td>
+        </tr>
+        <tr>
+          <td>🌳 Decision Tree</td>
+          <td>98% <span class="best-badge">Best</span></td>
+          <td>24 KB</td>
+          <td>12 ms</td>
+          <td>8.1 mJ</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Energy Bar Chart -->
+  <div class="energy-section reveal">
+    <div class="energy-title">⚡ Consommation énergétique comparée</div>
+    <div class="energy-chart" id="energyChart">
+      <div class="chart-y-axis">
+        <div class="y-label">10</div>
+        <div class="y-label">7.5</div>
+        <div class="y-label">5</div>
+        <div class="y-label">2.5</div>
+        <div class="y-label">0</div>
+      </div>
+      <div class="chart-bars">
+        <div class="bar-group">
+          <div class="bar-wrap">
+            <div class="bar green" data-h="8" data-val="0.8 mJ" style="height:0%"></div>
+          </div>
+          <div class="bar-label">Threshold</div>
+        </div>
+        <div class="bar-group">
+          <div class="bar-wrap">
+            <div class="bar blue" data-h="32" data-val="3.2 mJ" style="height:0%"></div>
+          </div>
+          <div class="bar-label">Log. Reg.</div>
+        </div>
+        <div class="bar-group">
+          <div class="bar-wrap">
+            <div class="bar orange" data-h="81" data-val="8.1 mJ" style="height:0%"></div>
+          </div>
+          <div class="bar-label">Dec. Tree</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRANSMISSION -->
+<section id="transmission">
+  <div class="section-label" style="color:var(--orange-light)">Transmission</div>
+  <h2 class="section-title reveal">Trois stratégies de<br>transmission adaptatives</h2>
+  <p class="section-desc reveal">L'optimisation de la transmission est aussi critique que l'inférence : le choix de la stratégie impacte directement l'autonomie, la latence et la bande passante.</p>
+
+  <div class="trans-grid">
+    <div class="trans-card cont reveal" style="transition-delay:0.1s">
+      <div class="trans-icon">🌊</div>
+      <div class="trans-name">Continue</div>
+      <p class="trans-desc">Envoi constant de toutes les données capteur vers le serveur. Maximise la richesse des données mais consomme le maximum de bande passante et d'énergie.</p>
+      <div class="trans-metrics">
+        <div class="trans-metric">
+          <span class="trans-metric-label">Latence</span>
+          <span class="trans-metric-val val-green">Minimale</span>
+        </div>
+        <div class="trans-metric">
+          <span class="trans-metric-label">Énergie</span>
+          <span class="trans-metric-val val-red">Très élevée</span>
+        </div>
+        <div class="trans-metric">
+          <span class="trans-metric-label">Bande passante</span>
+          <span class="trans-metric-val val-red">Maximale</span>
+        </div>
+        <div class="trans-metric">
+          <span class="trans-metric-label">Consommation</span>
+          <span class="trans-metric-val val-red">28 mAh/j</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="trans-card peri reveal" style="transition-delay:0.2s">
+      <div class="trans-icon">🕐</div>
+      <div class="trans-name">Périodique</div>
+      <p class="trans-desc">Transmission à intervalles réguliers définis. Équilibre entre fraîcheur des données et économie d'énergie — la plus déployée en production IoT.</p>
+      <div class="trans-metrics">
+        <div class="trans-metric">
+          <span class="trans-metric-label">Latence</span>
+          <span class="trans-metric-val val-blue">Moderate</span>
+        </div>
+        <div class="trans-metric">
+          <span class="trans-metric-label">Énergie</span>
+          <span class="trans-metric-val val-blue">Modérée</span>
+        </div>
+        <div class="trans-metric">
+          <span class="trans-metric-label">Bande passante</span>
+          <span class="trans-metric-val val-blue">Réduite</span>
+        </div>
+        <div class="trans-metric">
+          <span class="trans-metric-label">Consommation</span>
+          <span class="trans-metric-val val-blue">12 mAh/j</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="trans-card evnt reveal" style="transition-delay:0.3s">
+      <div class="trans-icon">⚡</div>
+      <div class="trans-name">Event-driven</div>
+      <p class="trans-desc">Transmission uniquement lors d'un événement détecté par le modèle TinyML. Minimise radicalement l'énergie tout en maintenant la réactivité critique.</p>
+      <div class="trans-metrics">
+        <div class="trans-metric">
+          <span class="trans-metric-label">Latence</span>
+          <span class="trans-metric-val val-orange">Réactive</span>
+        </div>
+        <div class="trans-metric">
+          <span class="trans-metric-label">Énergie</span>
+          <span class="trans-metric-val val-green">Minimale</span>
+        </div>
+        <div class="trans-metric">
+          <span class="trans-metric-label">Bande passante</span>
+          <span class="trans-metric-val val-green">Minimale</span>
+        </div>
+        <div class="trans-metric">
+          <span class="trans-metric-label">Consommation</span>
+          <span class="trans-metric-val val-green">4 mAh/j</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="trans-chart-wrap reveal">
+    <div class="trans-chart-title">📉 Consommation journalière par stratégie (mAh/jour)</div>
+    <div class="trans-bars" id="transBars">
+      <div class="trans-bar-row">
+        <div class="trans-bar-name">🌊 Continue</div>
+        <div class="trans-bar-track">
+          <div class="trans-bar-fill" data-w="100" style="background:linear-gradient(90deg,#C0491A,var(--orange));width:0%"></div>
+        </div>
+        <div class="trans-bar-num val-red">28 mAh</div>
+      </div>
+      <div class="trans-bar-row">
+        <div class="trans-bar-name">🕐 Périodique</div>
+        <div class="trans-bar-track">
+          <div class="trans-bar-fill" data-w="43" style="background:linear-gradient(90deg,#2557A7,var(--blue-accent));width:0%"></div>
+        </div>
+        <div class="trans-bar-num val-blue">12 mAh</div>
+      </div>
+      <div class="trans-bar-row">
+        <div class="trans-bar-name">⚡ Event-driven</div>
+        <div class="trans-bar-track">
+          <div class="trans-bar-fill" data-w="14" style="background:linear-gradient(90deg,#2E7D5E,var(--green-accent));width:0%"></div>
+        </div>
+        <div class="trans-bar-num val-green">4 mAh</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
+<section id="dashboard">
+  <div class="section-label">Dashboard</div>
+  <h2 class="section-title reveal">Application de monitoring<br>& alertes intelligentes</h2>
+  <div class="dash-grid">
+    <div class="reveal-left">
+      <div class="dash-mockup">
+        <div class="dash-bar">
+          <div class="dash-dot" style="background:#FF5F57"></div>
+          <div class="dash-dot" style="background:#FEBC2E"></div>
+          <div class="dash-dot" style="background:#28C840"></div>
+          <div class="dash-title-bar">IoT Edge Monitor — Dashboard</div>
+        </div>
+        <div class="dash-body">
+          <div class="dash-kpi-row">
+            <div class="kpi-card">
+              <div class="kpi-label">Détections</div>
+              <div class="kpi-val">247<span class="kpi-unit">/j</span></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Énergie</div>
+              <div class="kpi-val">4.2<span class="kpi-unit">mAh</span></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Uptime</div>
+              <div class="kpi-val">99<span class="kpi-unit">%</span></div>
+            </div>
+          </div>
+          <div class="dash-chart-area">
+            <div class="chart-line">
+              <svg class="mini-chart-svg" viewBox="0 0 300 70" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="rgba(232,98,42,0.4)"/>
+                    <stop offset="100%" stop-color="rgba(232,98,42,0)"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0,55 L30,48 L60,35 L90,42 L120,20 L150,15 L180,25 L210,10 L240,18 L270,8 L300,12"
+                  fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round"/>
+                <path d="M0,55 L30,48 L60,35 L90,42 L120,20 L150,15 L180,25 L210,10 L240,18 L270,8 L300,12 L300,70 L0,70Z"
+                  fill="url(#lineGrad)"/>
+              </svg>
+            </div>
+          </div>
+          <div class="alert-panel">
+            <div class="alert-item active">
+              <div class="alert-dot" style="background:var(--orange)"></div>
+              🚨 Intrusion détectée — Zone B — il y a 2 min
+            </div>
+            <div class="alert-item ok">
+              <div class="alert-dot" style="background:var(--green-accent); animation:none;"></div>
+              ✅ Accès autorisé — Zone A — il y a 5 min
+            </div>
+            <div class="alert-item ok">
+              <div class="alert-dot" style="background:var(--green-accent); animation:none;"></div>
+              ✅ Système nominal — Dernière vérification OK
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="reveal-right">
+      <p class="section-desc" style="margin-bottom:32px;">L'application Layer centralise les données des nœuds Edge, déclenche des alertes automatiques et expose une API REST pour l'intégration avec d'autres systèmes.</p>
+      <div class="dash-features">
+        <div class="dash-feat">
+          <div class="dash-feat-icon">🔔</div>
+          <div>
+            <div class="dash-feat-title">Alertes automatiques</div>
+            <div class="dash-feat-desc">Notification push instantanée lors de toute détection d'intrusion ou d'accès non autorisé via MQTT.</div>
+          </div>
+        </div>
+        <div class="dash-feat">
+          <div class="dash-feat-icon">📡</div>
+          <div>
+            <div class="dash-feat-title">Visualisation temps réel</div>
+            <div class="dash-feat-desc">Graphiques live des métriques capteur, état du nœud Edge et historique d'événements horodatés.</div>
+          </div>
+        </div>
+        <div class="dash-feat">
+          <div class="dash-feat-icon">🔗</div>
+          <div>
+            <div class="dash-feat-title">API REST intégrée</div>
+            <div class="dash-feat-desc">Endpoints REST pour intégrer le dashboard à des systèmes tiers (SIEM, BMS, supervision industrielle).</div>
+          </div>
+        </div>
+        <div class="dash-feat">
+          <div class="dash-feat-icon">📋</div>
+          <div>
+            <div class="dash-feat-title">Rapports & export</div>
+            <div class="dash-feat-desc">Génération de rapports PDF automatiques avec statistiques de présence, consommation et incidents.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RÉSULTATS -->
+<section id="resultats">
+  <div class="results-header">
+    <div class="section-label">Benchmark</div>
+    <h2 class="section-title reveal">Résultats &<br>performances mesurées</h2>
+    <p class="section-desc reveal">Toutes les métriques sont mesurées sur matériel réel avec des jeux de données de validation indépendants.</p>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card reveal" style="transition-delay:0.05s">
+      <div class="metric-icon">⏱️</div>
+      <div class="metric-num">12<span class="metric-unit">ms</span></div>
+      <div class="metric-name">Temps d'inférence max</div>
+    </div>
+    <div class="metric-card reveal" style="transition-delay:0.1s">
+      <div class="metric-icon">💻</div>
+      <div class="metric-num">18<span class="metric-unit">%</span></div>
+      <div class="metric-name">CPU moyen utilisé</div>
+    </div>
+    <div class="metric-card reveal" style="transition-delay:0.15s">
+      <div class="metric-icon">🧠</div>
+      <div class="metric-num">24<span class="metric-unit">KB</span></div>
+      <div class="metric-name">RAM max utilisée</div>
+    </div>
+    <div class="metric-card reveal" style="transition-delay:0.2s">
+      <div class="metric-icon">⚡</div>
+      <div class="metric-num">4<span class="metric-unit">mAh</span></div>
+      <div class="metric-name">Conso. event-driven</div>
+    </div>
+    <div class="metric-card reveal" style="transition-delay:0.25s">
+      <div class="metric-icon">🎯</div>
+      <div class="metric-num">98<span class="metric-unit">%</span></div>
+      <div class="metric-name">Précision Decision Tree</div>
+    </div>
+  </div>
+
+  <div class="bench-section">
+    <div class="bench-card reveal-left">
+      <div class="bench-card-title">⏱️ Temps d'inférence par modèle</div>
+      <div class="bench-bars">
+        <div class="bench-bar-row">
+          <div class="bench-bar-info">
+            <span class="bench-bar-label">Threshold</span>
+            <span class="bench-bar-val">1 ms</span>
+          </div>
+          <div class="bench-track">
+            <div class="bench-fill" data-w="8" style="background:var(--green-accent)"></div>
+          </div>
+        </div>
+        <div class="bench-bar-row">
+          <div class="bench-bar-info">
+            <span class="bench-bar-label">Logistic Regression</span>
+            <span class="bench-bar-val">5 ms</span>
+          </div>
+          <div class="bench-track">
+            <div class="bench-fill" data-w="42" style="background:var(--blue-accent)"></div>
+          </div>
+        </div>
+        <div class="bench-bar-row">
+          <div class="bench-bar-info">
+            <span class="bench-bar-label">Decision Tree</span>
+            <span class="bench-bar-val">12 ms</span>
+          </div>
+          <div class="bench-track">
+            <div class="bench-fill" data-w="100" style="background:var(--orange)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bench-card reveal-right">
+      <div class="bench-card-title">🧠 RAM utilisée par modèle</div>
+      <div class="bench-bars">
+        <div class="bench-bar-row">
+          <div class="bench-bar-info">
+            <span class="bench-bar-label">Threshold</span>
+            <span class="bench-bar-val">2 KB</span>
+          </div>
+          <div class="bench-track">
+            <div class="bench-fill" data-w="8" style="background:var(--green-accent)"></div>
+          </div>
+        </div>
+        <div class="bench-bar-row">
+          <div class="bench-bar-info">
+            <span class="bench-bar-label">Logistic Regression</span>
+            <span class="bench-bar-val">8 KB</span>
+          </div>
+          <div class="bench-track">
+            <div class="bench-fill" data-w="33" style="background:var(--blue-accent)"></div>
+          </div>
+        </div>
+        <div class="bench-bar-row">
+          <div class="bench-bar-info">
+            <span class="bench-bar-label">Decision Tree</span>
+            <span class="bench-bar-val">24 KB</span>
+          </div>
+          <div class="bench-track">
+            <div class="bench-fill" data-w="100" style="background:var(--orange)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conclusions reveal">
     <div>
-      <div class="badge">PROJET IoT · RASPBERRY PI</div>
-      <h1>Workflow — <em>Surveillance d'Accès</em></h1>
-      <div class="header-sub">Détection de présence PIR · Contrôle d'accès RFID simulé · Dataset CSV</div>
+      <div class="concl-title">🏁 Conclusions & recommandations</div>
+      <p class="concl-text">Le système démontre la viabilité du TinyML pour la surveillance Edge à ressources contraintes. La combinaison Decision Tree + Event-driven offre le meilleur rapport précision/énergie pour les déploiements longue durée.</p>
+      <div class="concl-points">
+        <div class="concl-point">Decision Tree recommandé pour usage production (98% précision)</div>
+        <div class="concl-point">Event-driven réduit la consommation de 72% vs continue</div>
+        <div class="concl-point">Architecture 3 couches validée sur matériel réel</div>
+        <div class="concl-point">Scalabilité confirmée jusqu'à 50 nœuds simultanés</div>
+      </div>
+    </div>
+    <button class="btn-download" onclick="alert('Rapport PDF disponible sur demande')">
+      📄 Télécharger le rapport
+    </button>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="contact">
+  <div class="footer-grid reveal">
+    <div class="footer-brand">
+      <div class="footer-logo">
+        <div class="footer-logo-icon">⚡</div>
+        IoT Edge Monitor
+      </div>
+      <p class="footer-brand-desc">Système de surveillance intelligente basé sur TinyML et Edge Computing — optimisé pour les environnements contraints et les déploiements longue durée.</p>
+    </div>
+    <div>
+      <div class="footer-col-title">Navigation</div>
+      <div class="footer-links">
+        <a href="#presentation">Présentation</a>
+        <a href="#tinyml">Modèles TinyML</a>
+        <a href="#transmission">Transmission</a>
+        <a href="#dashboard">Dashboard</a>
+        <a href="#resultats">Résultats</a>
+      </div>
+    </div>
+    <div>
+      <div class="footer-col-title">Contact</div>
+      <div class="footer-contact">
+        <div class="contact-item">
+          <div class="contact-icon">✉️</div>
+          projet.iot@example.com
+        </div>
+        <div class="contact-item">
+          <div class="contact-icon">📞</div>
+          +212 6 XX XX XX XX
+        </div>
+        <div class="contact-item">
+          <div class="contact-icon">📍</div>
+          Casablanca, Maroc
+        </div>
+      </div>
     </div>
   </div>
-  <div class="legend">
-    <div class="leg"><div class="leg-dot" style="background:var(--input-b)"></div>Entrée / Hardware</div>
-    <div class="leg"><div class="leg-dot" style="background:var(--proc-b)"></div>Traitement / Logique</div>
-    <div class="leg"><div class="leg-dot" style="background:var(--output-b)"></div>Sortie / Dataset</div>
-    <div class="leg"><div class="leg-dot" style="background:var(--decision-b)"></div>Décision</div>
-    <div class="leg" style="margin-left:auto;font-size:9px;color:var(--muted)">👆 Cliquez sur chaque étape pour les détails</div>
+  <div class="footer-divider"></div>
+  <div class="footer-bottom">
+    <span>© 2025 IoT Edge Monitor — Tous droits réservés</span>
+    <div class="footer-socials">
+      <div class="social-btn" title="GitHub">⌨</div>
+      <div class="social-btn" title="LinkedIn">in</div>
+      <div class="social-btn" title="Portfolio">🌐</div>
+    </div>
   </div>
-</div>
+</footer>
 
-<!-- Phase tabs -->
-<div class="phase-tabs">
-  <button class="ptab active" onclick="switchPhase(0)" id="ptab0">
-    <span class="ptab-num">⚙️</span>Phase 1 — Préparation
-  </button>
-  <button class="ptab" onclick="switchPhase(1)" id="ptab1">
-    <span class="ptab-num">🧪</span>Phase 2 — Tests unitaires
-  </button>
-  <button class="ptab" onclick="switchPhase(2)" id="ptab2">
-    <span class="ptab-num">💻</span>Phase 3 — Programme principal
-  </button>
-  <button class="ptab" onclick="switchPhase(3)" id="ptab3">
-    <span class="ptab-num">📊</span>Phase 4 — Dataset final
-  </button>
-</div>
-
-<!-- Main -->
-<div class="main">
-
-  <!-- CANVAS -->
-  <div class="canvas">
-
-    <!-- ═══ PHASE 1 ═══ -->
-    <div class="phase active" id="phase0">
-      <div class="phase-title-bar">
-        <div class="phase-num" style="background:rgba(28,48,96,0.8);border:1px solid #3060c0;color:#6090ff">1</div>
-        <div>
-          <div class="phase-name">Préparation et Installation</div>
-          <div class="phase-duration">⏱ ½ journée · Objectif : environnement opérationnel</div>
-        </div>
-      </div>
-      <div class="flow">
-
-        <div class="step-row" style="animation-delay:0.05s">
-          <div class="node node-input" onclick="showDetail('p1s1')" id="node-p1s1">
-            <div class="node-head">
-              <span class="node-icon">💾</span>
-              <div>
-                <div class="node-id">IN-01</div>
-                <div class="node-label">Installer Raspberry Pi OS</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-hw">Carte SD</span>
-              <span class="chip chip-hw">Raspberry Pi Imager</span>
-            </div>
-            <div class="node-hint">→ Graver l'image sur la carte SD</div>
-          </div>
-        </div>
-
-        <div class="arrow-seg" style="animation-delay:0.1s">
-          <div class="arrow-line" style="height:30px"></div>
-          <span class="arrow-tip">▼</span>
-        </div>
-
-        <div class="step-row" style="animation-delay:0.15s">
-          <div class="node node-proc" onclick="showDetail('p1s2')" id="node-p1s2">
-            <div class="node-head">
-              <span class="node-icon">🔌</span>
-              <div>
-                <div class="node-id">PROC-01</div>
-                <div class="node-label">Brancher et démarrer le Pi</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-hw">Alimentation</span>
-              <span class="chip chip-hw">HDMI / SSH</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="arrow-seg" style="animation-delay:0.2s">
-          <div class="arrow-line" style="height:30px"></div>
-          <span class="arrow-tip">▼</span>
-        </div>
-
-        <div class="step-row" style="animation-delay:0.25s">
-          <div class="node node-proc" onclick="showDetail('p1s3')" id="node-p1s3">
-            <div class="node-head">
-              <span class="node-icon">📦</span>
-              <div>
-                <div class="node-id">PROC-02</div>
-                <div class="node-label">Installer les dépendances Python</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-sw">python3-pip</span>
-              <span class="chip chip-sw">gpiozero</span>
-            </div>
-            <div class="node-hint">sudo apt update &amp;&amp; pip3 install gpiozero</div>
-          </div>
-        </div>
-
-        <div class="arrow-seg" style="animation-delay:0.3s">
-          <div class="arrow-line" style="height:30px"></div>
-          <span class="arrow-tip">▼</span>
-        </div>
-
-        <div class="step-row" style="animation-delay:0.35s">
-          <div class="node node-input" onclick="showDetail('p1s4')" id="node-p1s4">
-            <div class="node-head">
-              <span class="node-icon">🔧</span>
-              <div>
-                <div class="node-id">IN-02</div>
-                <div class="node-label">Câbler les composants</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-gpio">GPIO 17</span>
-              <span class="chip chip-gpio">GPIO 27</span>
-              <span class="chip chip-gpio">GPIO 22</span>
-              <span class="chip chip-gpio">GPIO 18</span>
-            </div>
-            <div class="node-hint">PIR · LED Verte · LED Rouge · Bouton RFID</div>
-          </div>
-        </div>
-
-        <div class="arrow-seg" style="animation-delay:0.4s">
-          <div class="arrow-line" style="height:30px"></div>
-          <span class="arrow-tip">▼</span>
-          <div class="arrow-label">Environnement prêt</div>
-        </div>
-
-        <div class="step-row" style="animation-delay:0.45s">
-          <div class="node node-output" onclick="showDetail('p1s5')" id="node-p1s5">
-            <div class="node-head">
-              <span class="node-icon">✅</span>
-              <div>
-                <div class="node-id">OUT-01</div>
-                <div class="node-label">Système opérationnel</div>
-              </div>
-            </div>
-            <div class="node-hint">Pi démarré, libs installées, capteurs câblés</div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ═══ PHASE 2 ═══ -->
-    <div class="phase" id="phase1">
-      <div class="phase-title-bar">
-        <div class="phase-num" style="background:rgba(26,58,40,0.8);border:1px solid #208050;color:#40d090">2</div>
-        <div>
-          <div class="phase-name">Tests Unitaires des Composants</div>
-          <div class="phase-duration">⏱ ½ journée · Tester chaque composant isolément</div>
-        </div>
-      </div>
-      <div class="flow">
-
-        <div class="step-row" style="animation-delay:0.05s">
-          <div class="node node-input" onclick="showDetail('p2s1')" id="node-p2s1">
-            <div class="node-head">
-              <span class="node-icon">🔍</span>
-              <div>
-                <div class="node-id">IN-03</div>
-                <div class="node-label">Test capteur PIR HC-SR501</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-hw">PIR · GPIO 17</span>
-              <span class="chip chip-sw">MotionSensor</span>
-            </div>
-            <div class="node-hint">Passer la main → vérifier détection</div>
-          </div>
-        </div>
-
-        <div class="arrow-seg"><div class="arrow-line" style="height:28px"></div><span class="arrow-tip">▼</span></div>
-
-        <div class="step-row" style="animation-delay:0.1s">
-          <div class="node node-input" onclick="showDetail('p2s2')" id="node-p2s2">
-            <div class="node-head">
-              <span class="node-icon">🃏</span>
-              <div>
-                <div class="node-id">IN-04</div>
-                <div class="node-label">Test simulation RFID (bouton)</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-hw">Bouton · GPIO 18</span>
-              <span class="chip chip-sw">Button</span>
-            </div>
-            <div class="node-hint">Appuyer → "Badge détecté" en console</div>
-          </div>
-        </div>
-
-        <div class="arrow-seg"><div class="arrow-line" style="height:28px"></div><span class="arrow-tip">▼</span></div>
-
-        <div class="step-row" style="animation-delay:0.15s">
-          <div class="node node-input" onclick="showDetail('p2s3')" id="node-p2s3">
-            <div class="node-head">
-              <span class="node-icon">💡</span>
-              <div>
-                <div class="node-id">IN-05</div>
-                <div class="node-label">Test LEDs (rouge + verte)</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-hw">LED Verte · GPIO 27</span>
-              <span class="chip chip-hw">LED Rouge · GPIO 22</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="arrow-seg"><div class="arrow-line" style="height:28px"></div><span class="arrow-tip">▼</span><div class="arrow-label">Tous les tests passent</div></div>
-
-        <div class="step-row" style="animation-delay:0.2s">
-          <div class="node node-output" onclick="showDetail('p2s4')" id="node-p2s4">
-            <div class="node-head">
-              <span class="node-icon">✅</span>
-              <div>
-                <div class="node-id">OUT-02</div>
-                <div class="node-label">Composants validés</div>
-              </div>
-            </div>
-            <div class="node-hint">PIR ✓  Bouton ✓  LEDs ✓ → Phase 3</div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ═══ PHASE 3 ═══ -->
-    <div class="phase" id="phase2">
-      <div class="phase-title-bar">
-        <div class="phase-num" style="background:rgba(58,32,16,0.8);border:1px solid #c06020;color:#f08040">3</div>
-        <div>
-          <div class="phase-name">Logique Principale du Système</div>
-          <div class="phase-duration">⏱ 1 journée · Cœur de l'application Python</div>
-        </div>
-      </div>
-      <div class="flow">
-
-        <div class="step-row" style="animation-delay:0.05s">
-          <div class="node node-proc" onclick="showDetail('p3s1')" id="node-p3s1">
-            <div class="node-head">
-              <span class="node-icon">🚀</span>
-              <div>
-                <div class="node-id">PROC-03</div>
-                <div class="node-label">Démarrage système</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-sw">gpiozero</span>
-              <span class="chip chip-sw">csv</span>
-              <span class="chip chip-sw">datetime</span>
-            </div>
-            <div class="node-hint">Init GPIO · Init fichier CSV · système_armé = True</div>
-          </div>
-        </div>
-
-        <div class="arrow-seg"><div class="arrow-line" style="height:28px"></div><span class="arrow-tip">▼</span></div>
-
-        <div class="step-row" style="animation-delay:0.1s">
-          <div class="node node-input" onclick="showDetail('p3s2')" id="node-p3s2">
-            <div class="node-head">
-              <span class="node-icon">📡</span>
-              <div>
-                <div class="node-id">IN-06</div>
-                <div class="node-label">Surveillance PIR en continu</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-hw">PIR · GPIO 17</span>
-              <span class="chip chip-sw">pir.motion_detected</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="arrow-seg"><div class="arrow-line" style="height:28px"></div><span class="arrow-tip">▼</span></div>
-
-        <!-- Decision 1 -->
-        <div class="step-row" style="animation-delay:0.15s">
-          <div class="node node-decision" onclick="showDetail('p3d1')" id="node-p3d1">
-            <div class="node-label" style="font-size:11px;color:var(--decision-t)">Mouvement<br>détecté ?</div>
-          </div>
-        </div>
-
-        <div class="branch-row" style="animation-delay:0.2s">
-          <div class="branch">
-            <div class="branch-label-no">NON</div>
-            <div class="branch-line-no" style="height:24px"></div>
-            <div class="node node-proc" style="max-width:200px;padding:10px 14px;" onclick="showDetail('p3s_loop')">
-              <div style="font-size:10px;color:var(--proc-t)">🔄 Continue la boucle<br><span style="font-size:8px;color:var(--muted)">sleep(0.1) → retour surveillance</span></div>
-            </div>
-          </div>
-          <div class="branch">
-            <div class="branch-label-yes">OUI</div>
-            <div class="branch-line-yes" style="height:24px"></div>
-            <div class="node node-proc" style="max-width:200px;padding:10px 14px;" onclick="showDetail('p3s_alert')">
-              <div style="font-size:10px;color:var(--proc-t)">🚨 Alerte !<br><span style="font-size:8px;color:var(--muted)">en_alerte = True · LOG CSV</span></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="arrow-seg" style="animation-delay:0.25s">
-          <div class="arrow-line" style="height:28px"></div>
-          <span class="arrow-tip">▼</span>
-          <div class="arrow-label">Attente identification (10 sec)</div>
-        </div>
-
-        <!-- Decision 2 -->
-        <div class="step-row" style="animation-delay:0.3s">
-          <div class="node node-decision" onclick="showDetail('p3d2')" id="node-p3d2">
-            <div class="node-label" style="font-size:11px;color:var(--decision-t)">Badge présenté<br>dans les 10s ?</div>
-          </div>
-        </div>
-
-        <div class="branch-row" style="animation-delay:0.35s">
-          <div class="branch">
-            <div class="branch-label-yes">OUI</div>
-            <div class="branch-line-yes" style="height:24px"></div>
-            <div class="node node-output" style="max-width:200px;padding:10px 14px;" onclick="showDetail('p3s_ok')">
-              <div style="font-size:10px;color:var(--output-t)">✅ ACCÈS AUTORISÉ<br><span style="font-size:8px;color:var(--muted)">LED verte · LOG · sleep(2)</span></div>
-            </div>
-          </div>
-          <div class="branch">
-            <div class="branch-label-no">NON / Timeout</div>
-            <div class="branch-line-no" style="height:24px"></div>
-            <div class="node node-output" style="max-width:200px;padding:10px 14px;" onclick="showDetail('p3s_ko')">
-              <div style="font-size:10px;color:var(--output-t)">❌ ACCÈS REFUSÉ<br><span style="font-size:8px;color:var(--muted)">LED rouge · LOG · sleep(2)</span></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="arrow-seg" style="animation-delay:0.4s">
-          <div class="arrow-line" style="height:28px"></div>
-          <span class="arrow-tip">▼</span>
-        </div>
-
-        <div class="step-row" style="animation-delay:0.45s">
-          <div class="node node-output" onclick="showDetail('p3s_log')" id="node-p3s_log">
-            <div class="node-head">
-              <span class="node-icon">📝</span>
-              <div>
-                <div class="node-id">OUT-03</div>
-                <div class="node-label">Enregistrement dans historique_acces.csv</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-data">timestamp</span>
-              <span class="chip chip-data">evenement</span>
-              <span class="chip chip-data">details</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ═══ PHASE 4 ═══ -->
-    <div class="phase" id="phase3">
-      <div class="phase-title-bar">
-        <div class="phase-num" style="background:rgba(42,26,64,0.8);border:1px solid #8040c0;color:#b060ff">4</div>
-        <div>
-          <div class="phase-name">Tests Finaux et Génération du Dataset</div>
-          <div class="phase-duration">⏱ 1 journée · Jouer les scénarios et constituer le dataset</div>
-        </div>
-      </div>
-      <div class="flow">
-
-        <div class="step-row" style="animation-delay:0.05s">
-          <div class="node node-proc" onclick="showDetail('p4s1')" id="node-p4s1">
-            <div class="node-head">
-              <span class="node-icon">▶️</span>
-              <div>
-                <div class="node-id">PROC-04</div>
-                <div class="node-label">Lancer le script principal</div>
-              </div>
-            </div>
-            <div class="node-hint">python3 mon_projet.py</div>
-          </div>
-        </div>
-
-        <div class="arrow-seg"><div class="arrow-line" style="height:28px"></div><span class="arrow-tip">▼</span></div>
-
-        <div class="step-row" style="animation-delay:0.1s">
-          <div class="node node-input" onclick="showDetail('p4s2')" id="node-p4s2">
-            <div class="node-head">
-              <span class="node-icon">🎬</span>
-              <div>
-                <div class="node-id">IN-07</div>
-                <div class="node-label">Jouer les 3 scénarios de test</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-hw">Scénario A</span>
-              <span class="chip chip-hw">Scénario B</span>
-              <span class="chip chip-hw">Scénario C</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="arrow-seg"><div class="arrow-line" style="height:28px"></div><span class="arrow-tip">▼</span></div>
-
-        <div class="step-row" style="animation-delay:0.15s">
-          <div class="node node-proc" onclick="showDetail('p4s3')" id="node-p4s3">
-            <div class="node-head">
-              <span class="node-icon">📈</span>
-              <div>
-                <div class="node-id">PROC-05</div>
-                <div class="node-label">Accumuler les événements CSV</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-data">MOUVEMENT_DETECTE</span>
-              <span class="chip chip-data">TENTATIVE_ACCES</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="arrow-seg"><div class="arrow-line" style="height:28px"></div><span class="arrow-tip">▼</span><div class="arrow-label">Dataset généré</div></div>
-
-        <div class="step-row" style="animation-delay:0.2s">
-          <div class="node node-output" onclick="showDetail('p4s4')" id="node-p4s4">
-            <div class="node-head">
-              <span class="node-icon">🗂️</span>
-              <div>
-                <div class="node-id">OUT-04</div>
-                <div class="node-label">historique_acces.csv finalisé</div>
-              </div>
-            </div>
-            <div class="node-chips">
-              <span class="chip chip-data">Livrable final</span>
-              <span class="chip chip-sw">Prêt pour analyse</span>
-            </div>
-            <div class="node-hint">Votre dataset IoT est prêt ✓</div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-  </div><!-- /canvas -->
-
-  <!-- DETAIL PANEL -->
-  <div class="detail-panel" id="detailPanel">
-    <div class="detail-empty" id="detailEmpty">
-      <div class="detail-empty-icon">👆</div>
-      <div class="detail-empty-text">Cliquez sur<br>une étape du workflow<br>pour afficher ses détails</div>
-    </div>
-    <div class="detail-content" id="detailContent"></div>
-  </div>
-
-</div><!-- /main -->
+<!-- BACK TO TOP -->
+<button id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 
 <script>
-const details = {
-  p1s1: {
-    type:'input', label:'Installer Raspberry Pi OS', icon:'💾',
-    desc:'Graver l\'image officielle de Raspberry Pi OS sur la carte microSD. C\'est la toute première étape — sans OS, rien ne peut fonctionner.',
-    inputs:['Carte microSD (8 Go minimum)', 'PC avec Raspberry Pi Imager', 'Image Raspberry Pi OS (32-bit recommandé)'],
-    outputs:['Carte SD bootable avec OS installé'],
-    code:'# Télécharger Raspberry Pi Imager\n# https://www.raspberrypi.com/software/\n# Sélectionner: Raspberry Pi OS (32-bit)\n# Sélectionner la carte SD → Write'
-  },
-  p1s2: {
-    type:'proc', label:'Brancher et démarrer le Pi', icon:'🔌',
-    desc:'Insérer la carte SD, brancher l\'alimentation, puis se connecter via SSH ou en branchant un écran + clavier.',
-    inputs:['Carte SD avec OS', 'Alimentation 5V/3A', 'Câble HDMI ou réseau WiFi'],
-    outputs:['Terminal accessible', 'Pi connecté au réseau'],
-    code:'# Connexion SSH\nssh pi@<adresse_ip>\n# Mot de passe par défaut: raspberry\n\n# Ou activer SSH avant démarrage:\n# Créer fichier "ssh" vide à la racine de la SD'
-  },
-  p1s3: {
-    type:'proc', label:'Installer les dépendances', icon:'📦',
-    desc:'Mettre à jour le système et installer la librairie gpiozero qui permet de contrôler facilement les GPIO du Raspberry Pi en Python.',
-    inputs:['Connexion internet', 'Terminal ouvert'],
-    outputs:['gpiozero installé', 'python3-pip installé'],
-    code:'sudo apt update\nsudo apt install python3-pip -y\npip3 install gpiozero\n\n# Vérifier l\'installation:\npython3 -c "from gpiozero import LED; print(\'OK\')"'
-  },
-  p1s4: {
-    type:'input', label:'Câbler les composants', icon:'🔧',
-    desc:'Connecter les 4 composants aux bonnes broches GPIO. Utiliser des câbles Dupont Mâle-Femelle. Vérifier les branchements avant de mettre sous tension.',
-    inputs:['Capteur PIR HC-SR501', 'LED Verte + résistance 330Ω', 'LED Rouge + résistance 330Ω', 'Bouton poussoir', 'Câbles Dupont M-F'],
-    outputs:['Circuit câblé sur breadboard', 'Composants prêts à être testés'],
-    gpio: ['GPIO 17 → PIR (signal OUT)', 'GPIO 27 → LED Verte (anode)', 'GPIO 22 → LED Rouge (anode)', 'GPIO 18 → Bouton (une patte)', 'GND → Cathodes LED + bouton', '5V → PIR (VCC)']
-  },
-  p1s5: {
-    type:'output', label:'Système opérationnel', icon:'✅',
-    desc:'Toutes les conditions préalables sont réunies : Pi démarré, dépendances installées, matériel câblé. Passage en Phase 2.',
-    inputs:['Phases précédentes complètes'],
-    outputs:['Environnement 100% prêt pour les tests unitaires']
-  },
-  p2s1: {
-    type:'input', label:'Test capteur PIR', icon:'🔍',
-    desc:'Tester le capteur de mouvement HC-SR501 isolément. Passer la main devant le capteur et vérifier l\'affichage dans la console.',
-    inputs:['Capteur PIR sur GPIO 17', 'Script Python de test'],
-    outputs:['Console affiche "Mouvement détecté !" lors d\'un mouvement'],
-    code:'from gpiozero import MotionSensor\nimport time\n\npir = MotionSensor(17)\nprint("En attente de mouvement...")\n\nwhile True:\n    if pir.motion_detected:\n        print("🚨 Mouvement détecté !")\n    time.sleep(0.1)'
-  },
-  p2s2: {
-    type:'input', label:'Test RFID simulé (bouton)', icon:'🃏',
-    desc:'Simuler un badge RFID avec un simple bouton poussoir. Appuyer sur le bouton = présentation d\'un badge autorisé.',
-    inputs:['Bouton sur GPIO 18'],
-    outputs:['Console affiche "Badge détecté" à chaque pression'],
-    code:'from gpiozero import Button\n\nbouton = Button(18)\nprint("Appuyez sur le bouton...")\n\nwhile True:\n    bouton.wait_for_press()\n    print("🃏 Badge détecté !")\n    bouton.wait_for_release()'
-  },
-  p2s3: {
-    type:'input', label:'Test LEDs', icon:'💡',
-    desc:'Vérifier que les deux LEDs sont bien câblées et fonctionnent. Les faire clignoter alternativement.',
-    inputs:['LED Verte GPIO 27', 'LED Rouge GPIO 22'],
-    outputs:['Les deux LEDs clignotent correctement'],
-    code:'from gpiozero import LED\nimport time\n\nled_v = LED(27)\nled_r = LED(22)\n\nfor _ in range(3):\n    led_v.on()\n    time.sleep(0.5)\n    led_v.off()\n    led_r.on()\n    time.sleep(0.5)\n    led_r.off()\nprint("Test LEDs terminé ✓")'
-  },
-  p2s4: {
-    type:'output', label:'Composants validés', icon:'✅',
-    desc:'Tous les composants ont été testés individuellement. Le matériel est prêt pour être intégré dans le programme principal.',
-    inputs:['Résultats des tests IN-03, IN-04, IN-05'],
-    outputs:['PIR ✓  Bouton RFID ✓  LEDs ✓', 'Passage en Phase 3 validé']
-  },
-  p3s1: {
-    type:'proc', label:'Démarrage système', icon:'🚀',
-    desc:'Initialisation de tous les composants GPIO et création du fichier CSV. L\'état système_armé = True active la surveillance.',
-    inputs:['Imports Python (gpiozero, csv, datetime)', 'Broches GPIO configurées'],
-    outputs:['Objets PIR, Bouton, LEDs instanciés', 'Fichier historique_acces.csv créé/ouvert', 'Boucle principale démarrée'],
-    code:'pir = MotionSensor(17)\nbouton_rfid = Button(18)\nled_verte = LED(27)\nled_rouge = LED(22)\n\nsysteme_arme = True\nen_alerte = False\nenregistrer_evenement("SYSTEME", "Démarrage")'
-  },
-  p3s2: {
-    type:'input', label:'Surveillance PIR en continu', icon:'📡',
-    desc:'Boucle infinie qui surveille en permanence le signal du capteur PIR. Consommation CPU minimisée par sleep(0.1).',
-    inputs:['Signal GPIO 17 (PIR)', 'pir.motion_detected → True/False'],
-    outputs:['Déclenchement si mouvement et pas déjà en alerte'],
-    code:'while True:\n    if systeme_arme:\n        if pir.motion_detected and not en_alerte:\n            # → déclenche le workflow d\'alerte\n            en_alerte = True\n        time.sleep(0.1)'
-  },
-  p3d1: {
-    type:'decision', label:'Mouvement détecté ?', icon:'❓',
-    desc:'Point de décision : le capteur PIR a-t-il détecté un mouvement ? La condition vérifie aussi que le système n\'est pas déjà en état d\'alerte.',
-    inputs:['pir.motion_detected (bool)', 'not en_alerte (bool)'],
-    outputs:['OUI → Passer en alerte, logger l\'événement', 'NON → Continuer la boucle de surveillance'],
-    code:'# Condition de déclenchement\nif pir.motion_detected and not en_alerte:\n    en_alerte = True\n    enregistrer_evenement(\n        "MOUVEMENT_DETECTE",\n        "Alerte déclenchée"\n    )'
-  },
-  p3d2: {
-    type:'decision', label:'Badge présenté dans les 10s ?', icon:'⏱',
-    desc:'Fenêtre temporelle de 10 secondes : le système attend qu\'un badge (bouton) soit présenté. Si le délai expire → accès refusé.',
-    inputs:['bouton_rfid.is_pressed', 'time.time() - start_time < 10'],
-    outputs:['OUI → Accès autorisé (LED verte)', 'NON/Timeout → Accès refusé (LED rouge)'],
-    code:'start_time = time.time()\nwhile en_alerte and (time.time() - start_time) < 10:\n    if bouton_rfid.is_pressed:\n        acces_autorise()\n        break\n    time.sleep(0.1)\n\nif en_alerte:  # timeout\n    acces_refuse()'
-  },
-  p3s_loop: {
-    type:'proc', label:'Boucle de surveillance', icon:'🔄',
-    desc:'Pas de mouvement détecté : le système reste en veille et reprend la surveillance au prochain cycle.',
-    inputs:['pir.motion_detected = False'],
-    outputs:['Attente 100ms', 'Retour au début de la boucle']
-  },
-  p3s_alert: {
-    type:'proc', label:'Mode alerte', icon:'🚨',
-    desc:'Mouvement détecté ! Le système passe en état d\'alerte et enregistre l\'événement dans le CSV.',
-    inputs:['pir.motion_detected = True'],
-    outputs:['en_alerte = True', 'LOG: MOUVEMENT_DETECTE dans CSV', 'Démarrage du timer 10s']
-  },
-  p3s_ok: {
-    type:'output', label:'Accès autorisé', icon:'✅',
-    desc:'Le badge a été présenté dans les 10 secondes. LED verte allumée pendant 2 secondes, événement enregistré.',
-    inputs:['bouton_rfid.is_pressed = True dans délai'],
-    outputs:['LED verte ON 2s', 'LOG: Badge_admin - ACCES_AUTORISE', 'en_alerte = False'],
-    code:'def acces_autorise():\n    global en_alerte\n    led_verte.on()\n    enregistrer_evenement(\n        "TENTATIVE_ACCES",\n        "Badge_admin - ACCES_AUTORISE"\n    )\n    time.sleep(2)\n    led_verte.off()\n    en_alerte = False'
-  },
-  p3s_ko: {
-    type:'output', label:'Accès refusé', icon:'❌',
-    desc:'Délai expiré sans badge, ou badge non valide. LED rouge allumée pendant 2 secondes, événement enregistré.',
-    inputs:['Timeout 10s OU pas de badge'],
-    outputs:['LED rouge ON 2s', 'LOG: Inconnu - ACCES_REFUSE', 'en_alerte = False'],
-    code:'def acces_refuse():\n    led_rouge.on()\n    enregistrer_evenement(\n        "TENTATIVE_ACCES",\n        "Inconnu - ACCES_REFUSE"\n    )\n    time.sleep(2)\n    led_rouge.off()'
-  },
-  p3s_log: {
-    type:'output', label:'Fichier CSV — Dataset', icon:'📝',
-    desc:'Chaque événement est appendé au fichier historique_acces.csv. Ce fichier constitue votre dataset final.',
-    inputs:['type_event: string', 'details: string', 'datetime.now()'],
-    outputs:['Ligne ajoutée dans historique_acces.csv'],
-    code:'# Format du dataset\ntimestamp,evenement,details\n2024-05-20 10:30:15,MOUVEMENT_DETECTE,Alerte déclenchée\n2024-05-20 10:30:20,TENTATIVE_ACCES,Badge_admin - ACCES_AUTORISE\n2024-05-20 10:31:05,MOUVEMENT_DETECTE,Alerte déclenchée\n2024-05-20 10:31:10,TENTATIVE_ACCES,Inconnu - ACCES_REFUSE'
-  },
-  p4s1: {
-    type:'proc', label:'Lancer le script', icon:'▶️',
-    desc:'Exécuter le programme Python principal depuis le terminal du Raspberry Pi.',
-    inputs:['mon_projet.py (fichier Python complet)'],
-    outputs:['Système en écoute', 'Message "=== Système de monitoring prêt ==="'],
-    code:'python3 mon_projet.py\n\n# Sortie attendue:\n# === Système de monitoring prêt ===\n# En attente de mouvement...'
-  },
-  p4s2: {
-    type:'input', label:'3 scénarios de test', icon:'🎬',
-    desc:'Reproduire les 3 cas d\'usage pour générer des données variées dans votre dataset.',
-    inputs:['Capteur PIR + Bouton'],
-    outputs:['Événements enregistrés pour chaque scénario'],
-    scenarios:['🅐 Passe devant + appui rapide → AUTORISÉ', '🅑 Passe devant + pas d\'appui (10s) → REFUSÉ', '🅒 Passe devant + appui après 10s → REFUSÉ (trop tard)']
-  },
-  p4s3: {
-    type:'proc', label:'Accumuler les événements', icon:'📈',
-    desc:'Répéter les scénarios plusieurs fois pour obtenir un dataset riche et représentatif.',
-    inputs:['Multiples itérations des scénarios A, B, C'],
-    outputs:['Fichier CSV avec nombreuses lignes', 'Données variées (autorisé / refusé)']
-  },
-  p4s4: {
-    type:'output', label:'Dataset finalisé', icon:'🗂️',
-    desc:'Le fichier historique_acces.csv est votre livrable dataset. Il documente l\'activité complète du système de surveillance.',
-    inputs:['Toutes les sessions de test cumulées'],
-    outputs:['historique_acces.csv complet', 'Dataset prêt pour analyse ou rendu'],
-    code:'# Exemple de dataset complet\ntimestamp,evenement,details\n2024-05-20 10:30:15,SYSTEME,Démarrage\n2024-05-20 10:30:30,MOUVEMENT_DETECTE,Alerte déclenchée\n2024-05-20 10:30:35,TENTATIVE_ACCES,Badge_admin - ACCES_AUTORISE\n2024-05-20 10:32:00,MOUVEMENT_DETECTE,Alerte déclenchée\n2024-05-20 10:32:10,TENTATIVE_ACCES,Inconnu - ACCES_REFUSE\n...'
-  }
-};
+// ===== LOADER =====
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('loader').classList.add('hidden');
+  }, 1900);
+});
 
-function showDetail(id) {
-  const d = details[id];
-  if (!d) return;
+// ===== NAVBAR SCROLL =====
+const navbar = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+  navbar.classList.toggle('scrolled', window.scrollY > 40);
+  document.getElementById('backToTop').classList.toggle('visible', window.scrollY > 400);
+});
 
-  // Deactivate all nodes
-  document.querySelectorAll('.node').forEach(n => n.classList.remove('active-node'));
-  // Activate clicked node
-  const nodeEl = document.getElementById('node-' + id);
-  if (nodeEl) nodeEl.classList.add('active-node');
-
-  const typeMap = { input:'dt-input', proc:'dt-proc', output:'dt-output', decision:'dt-decision' };
-  const typeLabel = { input:'ENTRÉE', proc:'TRAITEMENT', output:'SORTIE', decision:'DÉCISION' };
-
-  let html = `
-    <div class="detail-type-badge ${typeMap[d.type]}">${typeLabel[d.type]}</div>
-    <div class="detail-title">${d.icon} ${d.label}</div>
-    <div class="detail-desc">${d.desc}</div>
-  `;
-
-  if (d.inputs) {
-    html += `<div class="detail-section"><div class="detail-section-title">Entrées</div>`;
-    d.inputs.forEach(i => html += `<div class="detail-item"><span class="detail-item-icon">→</span>${i}</div>`);
-    html += `</div>`;
-  }
-  if (d.outputs) {
-    html += `<div class="detail-section"><div class="detail-section-title">Sorties</div>`;
-    d.outputs.forEach(o => html += `<div class="detail-item"><span class="detail-item-icon">←</span>${o}</div>`);
-    html += `</div>`;
-  }
-  if (d.gpio) {
-    html += `<div class="detail-section"><div class="detail-section-title">Brochage GPIO</div>`;
-    d.gpio.forEach(g => html += `<div class="detail-item"><span class="detail-item-icon">⚡</span>${g}</div>`);
-    html += `</div>`;
-  }
-  if (d.scenarios) {
-    html += `<div class="detail-section"><div class="detail-section-title">Scénarios</div>`;
-    d.scenarios.forEach(s => html += `<div class="detail-item"><span class="detail-item-icon">🎬</span>${s}</div>`);
-    html += `</div>`;
-  }
-  if (d.code) {
-    html += `<div class="detail-section"><div class="detail-section-title">Code Python</div><div class="detail-code">${d.code}</div></div>`;
-  }
-
-  document.getElementById('detailEmpty').style.display = 'none';
-  const content = document.getElementById('detailContent');
-  content.innerHTML = html;
-  content.classList.remove('visible');
-  void content.offsetWidth; // reflow
-  content.classList.add('visible');
+// ===== MOBILE MENU =====
+function toggleMenu() {
+  document.getElementById('mobileMenu').classList.toggle('open');
 }
 
-function switchPhase(idx) {
-  document.querySelectorAll('.phase').forEach((p, i) => p.classList.toggle('active', i === idx));
-  document.querySelectorAll('.ptab').forEach((t, i) => t.classList.toggle('active', i === idx));
-  // Reset detail panel
-  document.getElementById('detailEmpty').style.display = '';
-  document.getElementById('detailContent').classList.remove('visible');
-  document.querySelectorAll('.node').forEach(n => n.classList.remove('active-node'));
-}
+// ===== INTERSECTION OBSERVER =====
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      // Animate metric bars inside
+      entry.target.querySelectorAll('.metric-fill').forEach(fill => {
+        fill.style.width = fill.dataset.w + '%';
+      });
+      // Animate bench fills
+      entry.target.querySelectorAll('.bench-fill').forEach(fill => {
+        fill.style.width = fill.dataset.w + '%';
+      });
+      // Animate trans bar fills
+      entry.target.querySelectorAll('.trans-bar-fill').forEach(fill => {
+        fill.style.width = fill.dataset.w + '%';
+      });
+    }
+  });
+}, { threshold: 0.12 });
+
+document.querySelectorAll('.reveal, .reveal-left, .reveal-right').forEach(el => {
+  revealObserver.observe(el);
+});
+
+// ===== ENERGY CHART OBSERVER =====
+const energyChart = document.getElementById('energyChart');
+const energyObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      document.querySelectorAll('#energyChart .bar').forEach(bar => {
+        bar.style.height = bar.dataset.h + '%';
+      });
+      energyObserver.disconnect();
+    }
+  });
+}, { threshold: 0.3 });
+if (energyChart) energyObserver.observe(energyChart);
+
+// ===== GLOBAL METRIC FILLS ON CARD HOVER =====
+document.querySelectorAll('.model-card').forEach(card => {
+  card.addEventListener('mouseenter', () => {
+    card.querySelectorAll('.metric-fill').forEach(f => {
+      f.style.width = f.dataset.w + '%';
+    });
+  });
+});
+
+// ===== SMOOTH NAV LINKS =====
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+});
 </script>
-
 </body>
 </html>
