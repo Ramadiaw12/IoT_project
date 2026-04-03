@@ -4,17 +4,17 @@ import time
 import psutil
 import os
 
-# 📊 Simulation dataset (présence + RFID)
+# Simulation dataset (présence + RFID)
 np.random.seed(42)
 
 X = np.random.rand(1000, 2)  # [mouvement, RFID]
 y = (X[:, 0] + X[:, 1] > 1).astype(int)  # 1 = accès suspect
 
-# 🧠 Modèle TinyML simple
+# Modèle TinyML simple
 model = LogisticRegression()
 model.fit(X, y)
 
-# 📈 Benchmark
+# Benchmark
 process = psutil.Process(os.getpid())
 
 start_time = time.time()
@@ -26,7 +26,7 @@ end_time = time.time()
 cpu = psutil.cpu_percent()
 memory = process.memory_info().rss / (1024 * 1024)
 
-# 🔋 Simulation énergie
+# Simulation énergie
 energy = cpu * (end_time - start_time) * 0.1
 
 print("===== TINYML RESULT =====")
