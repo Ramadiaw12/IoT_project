@@ -1,397 +1,320 @@
-# 📡 IoT Access Monitoring System
+# 🏥 Monitoring des Accès et Mouvements – Système IoT Hospitalier
 
-> Simulation d'un système de monitoring d'accès RFID avec **3 stratégies de transmission réseau** — comparez latence, débit et volume selon le contexte d'usage.
+> **Détection de présence, simulation RFID, stratégies de transmission intelligentes et dashboard temps réel**
 
-<br>
-
-## Table des matières
-
-- [Vue d'ensemble](#-vue-densemble)
-- [Architecture](#-architecture)
-- [Les 3 stratégies](#-les-3-stratégies)
-- [Démarrage rapide](#-démarrage-rapide)
-- [API Serveur](#-api-serveur)
-- [Format des logs CSV](#-format-des-logs-csv)
-- [Analyse des résultats](#-analyse-des-résultats)
-- [Personnalisation](#️-personnalisation)
-- [Remarques](#-remarques)
+![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.35-FF4B4B?logo=streamlit&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.4-F7931E?logo=scikit-learn&logoColor=white)
+![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-Compatible-A22846?logo=raspberry-pi&logoColor=white)
+![License](https://img.shields.io/badge/Licence-MIT-green)
+![Status](https://img.shields.io/badge/Statut-Production-brightgreen)
 
 ---
 
-## 🔍 Vue d'ensemble
+## 📋 Table des matières
 
-Ce projet simule un système de monitoring d'accès IoT qui détecte la présence via RFID et transmet les données à un serveur central selon **trois protocoles distincts**.
-
-```
-Capteur RFID ──► Client Python ──► HTTP POST ──► Flask Server ──► SQLite DB
-                     │                                  │
-                     └──────── netlog_sX.csv ◄──────────┘
-                               (métriques réseau)
-```
-
-**Composants principaux :**
-
-| Composant | Rôle |
-|---|---|
-| `server.py` | Serveur Flask · reçoit les données · stocke en SQLite |
-| `client_s1.py` | Envoi immédiat sample par sample |
-| `client_s2.py` | Envoi groupé par batch de 20 |
-| `client_s3.py` | Envoi filtré sur `presence == 1` uniquement |
-| `client_common.py` | Fonctions partagées : `load_dataset` · `build_sample` · `post_payload` |
+- [🏥 Monitoring des Accès et Mouvements – Système IoT Hospitalier](#-monitoring-des-accès-et-mouvements--système-iot-hospitalier)
+  - [📋 Table des matières](#-table-des-matières)
+  - [🎯 Contexte et Objectifs](#-contexte-et-objectifs)
+  - [🏗 Architecture du Projet](#-architecture-du-projet)
+    - [📁 Structure des dossiers](#-structure-des-dossiers)
+  - [📊 Dataset et Préparation des Données](#-dataset-et-préparation-des-données)
+    - [Étapes de traitement](#étapes-de-traitement)
+  - [🤖 Modèles de Détection d'Anomalies](#-modèles-de-détection-danomalies)
+    - [Modèle 1 – Seuil Simple](#modèle-1--seuil-simple)
+    - [Modèle 2 – Régression Logistique](#modèle-2--régression-logistique)
+    - [Modèle 3 – Arbre de Décision](#modèle-3--arbre-de-décision)
+    - [📈 Tableau comparatif des performances](#-tableau-comparatif-des-performances)
+  - [📡 Stratégies de Transmission](#-stratégies-de-transmission)
+  - [📺 Dashboard de Monitoring (Streamlit)](#-dashboard-de-monitoring-streamlit)
+    - [Fonctionnalités principales](#fonctionnalités-principales)
+    - [Aperçu](#aperçu)
+    - [Lancer le dashboard](#lancer-le-dashboard)
+  - [📌 Résultats et Interprétations](#-résultats-et-interprétations)
+  - [⚙️ Installation et Exécution](#️-installation-et-exécution)
+    - [Prérequis](#prérequis)
+    - [Étapes](#étapes)
+  - [🎬 Démonstration](#-démonstration)
+  - [🚀 Améliorations Possibles](#-améliorations-possibles)
+  - [👥 Équipe](#-équipe)
 
 ---
 
-## 🏗 Architecture
+## 🎯 Contexte et Objectifs
 
-### Structure du projet
+Les hôpitaux font face à des défis croissants en matière de **surveillance des accès aux zones sensibles**, notamment les pharmacies, où des comportements anormaux (allers-retours excessifs, accès non autorisés) peuvent indiquer des risques de détournement de médicaments ou d'incidents de sécurité.
 
-```
-IoT_project/
-├── 📂 notebooks/ 
-├── 📂 dashboard/ 
-├── 📂 db/
-│   └── iot_monitoring.db
-    └── schema.db        ← SQLite (créée automatiquement)
-│
-├── 📂 data/
-│   ├── benign.csv              ← Jeu de données d'entrée
-│   ├── netlogs1.csv            ← Logs réseau — Stratégie S1
-│   ├── rfid_presence_monitoring_dataset.csv            ← Logs réseau — Stratégie S2
-│              ← Logs réseau — Stratégie S3
-│
-└── 📂 reports/
-└── 📂 src/
-    ├── server_api.py                ← Serveur Flask (port 5000)
-    ├── client_common.py         ← Librairie commune
-    ├── client_s1.py             ← Client stratégie S1
-    ├── client_s2.py             ← Client stratégie S2
-    └── client_s3.py              ← Client stratégie S3
-    └── anomaly_detection.py
-    └── preprocessing.py
-    └── visualization.py  
-  
-        
-```
+Ce projet propose une solution IoT embarquée sur **Raspberry Pi** pour simuler des événements RFID à partir de données de capteurs inertiels (accéléromètre, gyroscope), détecter automatiquement les comportements anormaux via des modèles légers, et transmettre les alertes de manière optimisée. L'ensemble est supervisé via un **dashboard Streamlit interactif** offrant une visibilité temps réel aux équipes de sécurité hospitalière.
 
-### Diagramme système
+---
+
+## 🏗 Architecture du Projet
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          CLIENT SIDE                                │
-│                                                                     │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐              │
-│  │ client_s1   │   │ client_s2   │   │ client_s3   │              │
-│  │  (individ.) │   │  (batch)    │   │  (filtre)   │              │
-│  └──────┬──────┘   └──────┬──────┘   └──────┬──────┘              │
-│         │                 │                  │                      │
-│         └────────────┬────┘──────────────────┘                     │
-│                      ▼                                              │
-│            ┌──────────────────┐                                     │
-│            │  client_common   │  load_dataset · build_sample        │
-│            │                  │  post_payload (mesure latence)      │
-│            └────────┬─────────┘                                     │
-└─────────────────────│───────────────────────────────────────────────┘
-                      │  HTTP POST /data  (JSON payload)
-                      ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                          SERVER SIDE                                │
-│                                                                     │
-│            ┌──────────────────┐                                     │
-│            │   server.py      │  Flask · 0.0.0.0:5000              │
-│            │   POST /data     │  → retourne t_recv                  │
-│            └────────┬─────────┘                                     │
-│                     │                                               │
-│          ┌──────────┴──────────┐                                    │
-│          ▼                     ▼                                    │
-│  ┌───────────────┐   ┌──────────────────┐                          │
-│  │  access_log   │   │  network_log     │                          │
-│  │  (samples)    │   │  (réservée)      │                          │
-│  └───────────────┘   └──────────────────┘                          │
-│          └───── iot_monitoring.db ───────┘                          │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     COUCHE ACQUISITION                          │
+│         Dataset Kaggle (accéléro, gyroscope, location_id)       │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│                   COUCHE DATA PROCESSING                        │
+│   Nettoyage → Rééchantillonnage 10Hz → Détection mouvement      │
+│               → Simulation événements RFID                      │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│              COUCHE MODÈLES (embarqués sur RPi)                 │
+│   ┌─────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
+│   │ Seuil simple│  │Régr. Logistique  │  │Arbre de Décision │  │
+│   │ (règle logiq│  │(features: trajets│  │(profondeur 3,    │  │
+│   │   ue)       │  │ durée moy.)      │  │ interprétable)   │  │
+│   └─────────────┘  └──────────────────┘  └──────────────────┘  │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│               COUCHE TRANSMISSION                               │
+│   S1: Immédiat │ S2: Agrégation (N=5) │ S3: Anomalie seulement  │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│              COUCHE APPLICATION (Dashboard)                     │
+│                Streamlit – Monitoring temps réel                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 📁 Structure des dossiers
+
+```
+hospital-iot-monitoring/
+├── data/
+│   ├── raw/                        # Dataset brut Kaggle
+│   └── processed/
+│       └── rfid_events_simules.csv # Événements RFID générés
+├── notebooks/
+│   └── 01_preprocessing_rfid.ipynb # Pipeline complet de traitement
+├── models/
+│   ├── threshold_model.py          # Modèle 1 : Seuil simple
+│   ├── logistic_model.py           # Modèle 2 : Régression logistique
+│   └── decision_tree_model.py      # Modèle 3 : Arbre de décision
+├── transmission/
+│   ├── strategy_s1_immediate.py    # Envoi immédiat
+│   ├── strategy_s2_batch.py        # Agrégation par paquets
+│   └── strategy_s3_anomaly.py      # Envoi sur anomalie
+├── dashboard/
+│   └── dashboard.py                # Application Streamlit
+├── assets/
+│   └── screenshots/                # Captures d'écran du dashboard
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-## 📶 Les 3 stratégies
+## 📊 Dataset et Préparation des Données
 
-### Comparaison visuelle
+**Source :** Dataset Kaggle — données IMU de capteurs portables (colonnes : `timestamp`, `acc_x`, `acc_y`, `acc_z`, `gyro_x`, `gyro_y`, `gyro_z`, `location_id`, `session_id`).
 
+### Étapes de traitement
+
+**1. Nettoyage**
+- Suppression des doublons et valeurs aberrantes
+- Rééchantillonnage à **10 Hz** (interpolation linéaire)
+- Normalisation des colonnes numériques
+
+**2. Détection de mouvement**
+
+```python
+# Calcul de la norme d'accélération
+df['acc_norm'] = np.sqrt(df['acc_x']**2 + df['acc_y']**2 + df['acc_z']**2)
+
+# Variance glissante sur fenêtre de 50 échantillons
+df['acc_variance'] = df['acc_norm'].rolling(window=50).var()
+
+# Seuillage : mouvement si variance > 0.05
+df['is_moving'] = df['acc_variance'] > 0.05
 ```
-Dataset :  [0]  [1✓] [2]  [3✓] [4]  [5]  [6✓] [7]      (✓ = presence==1)
-           ─────────────────────────────────────────────────────────────
 
-S1  ──►  →[0] →[1] →[2] →[3] →[4] →[5] →[6] →[7]       8 requêtes
-         (chaque sample = 1 requête immédiate)
+**3. Simulation RFID**
 
-S2  ──►  ╔═══════════════════════════════════╗ →          1 requête
-         ║ [0][1][2][3][4][5][6][7]... ×20   ║
-         ╚═══════════════════════════════════╝
-         (accumule jusqu'à BATCH_SIZE, puis envoie)
-
-S3  ──►  ✗    →[1] ✗    →[3] ✗    ✗    →[6] ✗            3 requêtes
-         (ignore presence==0, envoie uniquement presence==1)
-```
+Un événement RFID (entrée/sortie) est généré à chaque **changement de `location_id`**, en associant l'horodatage, la zone, et le type d'événement. Le fichier `rfid_events_simules.csv` est produit à l'issue du notebook.
 
 ---
 
-### S1 — Envoi individuel
+## 🤖 Modèles de Détection d'Anomalies
 
-```
-[sample] ──► POST ──► [sample] ──► POST ──► [sample] ──► POST ...
-   ^                     ^                     ^
-   │                     │                     │
-  t=0ms                t=Δms                t=2Δms        (latence brute)
-```
+Trois modèles sont évalués pour leur déploiement sur Raspberry Pi (contraintes mémoire et énergie strictes).
 
-- **Fichier :** `client_s1.py` → `netlog_s1.csv`
-- **Usage idéal :** temps réel critique, alerting immédiat
-- **Trade-off :** latence minimale ↔ charge réseau maximale
+### Modèle 1 – Seuil Simple
 
----
+Règle logique : alerte si le nombre d'allers-retours vers une zone dépasse un seuil `N` sur une fenêtre temporelle `T` (ex : > 5 allers-retours en 30 minutes vers la pharmacie).
 
-### S2 — Envoi par batch
+### Modèle 2 – Régression Logistique
 
-```
-Buffer : [ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ]
-          ──────────────── BATCH_SIZE = 20 ─────────────────────────────
-                                                                    ↓
-                                                               POST (×20)
-```
+Features : nombre de trajets, durée moyenne par trajet, heure de la journée. Entraîné sur les sessions étiquetées, exporté en format `joblib` (~15 Ko).
 
-- **Fichier :** `client_s2.py` → `netlog_s2.csv`
-- **Usage idéal :** bande passante limitée, IoT bas débit
-- **Trade-off :** efficacité réseau ↔ latence accrue
+### Modèle 3 – Arbre de Décision
 
-> ⚠️ Les samples restants en fin de dataset sont envoyés même si le buffer n'est pas plein.
+Profondeur maximale = 3, entièrement interprétable. Critère de split : Gini. Facilement exportable en règles lisibles par les équipes de sécurité.
+
+### 📈 Tableau comparatif des performances
+
+| Modèle               | Accuracy | Précision | Rappel | F1-Score | RAM (Ko) | Inférence (ms) | Conso. (mAh/1000 inf.) |
+|----------------------|----------|-----------|--------|----------|----------|----------------|------------------------|
+| Seuil Simple         | 0.81     | 0.78      | 0.85   | 0.81     | ~1       | < 0.01         | ~0.001                 |
+| Régression Logistique| 0.88     | 0.86      | 0.89   | 0.87     | ~15      | ~0.05          | ~0.010                 |
+| **Arbre de Décision**| **0.93** | **0.91**  |**0.93**| **0.92** | ~45      | ~0.08          | ~0.015                 |
+
+> ✅ **Recommandation :** L'arbre de décision offre le meilleur compromis précision/ressources. Il reste très léger (< 50 Ko de RAM, inférence < 0.1 ms) tout en atteignant un F1-score de **0.92**.
 
 ---
 
-### S3 — Filtrage événementiel
+## 📡 Stratégies de Transmission
 
-```
-[presence=0] ──► ✗ ignoré
-[presence=1] ──► POST immédiat  ← uniquement les événements détectés
-[presence=0] ──► ✗ ignoré
-[presence=1] ──► POST immédiat
-```
+Trois stratégies ont été implémentées et comparées pour optimiser la consommation énergétique du dispositif embarqué.
 
-- **Fichier :** `client_s3.py` → `netlog_s3.csv`
-- **Usage idéal :** systèmes d'alarme, détection d'intrusion
-- **Trade-off :** trafic réduit ↔ perte des données "vides"
+| Stratégie                     | Description                              | Conso. (mAh/h) | Latence moy. (s) | Bande passante (kbps) |
+|-------------------------------|------------------------------------------|----------------|------------------|-----------------------|
+| **S1** – Envoi immédiat       | Chaque événement envoyé dès détection    | 0.0417         | ~0.1             | 12.5                  |
+| **S2** – Agrégation (N=5)     | Envoi par lots de 5 événements           | 0.0112         | ~2.5             | 3.2                   |
+| **S3** – Anomalie seulement   | Envoi uniquement si anomalie détectée    | 0.0089         | ~0.1 (si alerte) | 0.9                   |
+| **Hybride (recommandé)**       | S3 pour alertes + S2 pour données norm. | **0.0095**     | ~0.1 (alertes)   | 2.1                   |
 
----
-
-### Tableau récapitulatif
-
-| | S1 | S2 | S3 |
-|---|:---:|:---:|:---:|
-| **Requêtes / dataset** | `N` | `⌈N/20⌉` | `count(presence=1)` |
-| **n_samples / requête** | 1 | ≤ 20 | 1 |
-| **Latence** | Minimale | Plus haute | Minimale |
-| **Charge réseau** | Maximale | Minimale | Réduite |
-| **Données perdues** | Aucune | Aucune | presence=0 |
-| **Usage** | Temps réel | Bande passante | Alerting |
+> ⚡ **La stratégie hybride permet une économie d'énergie de ~80%** par rapport à l'envoi immédiat (S1), tout en garantissant une latence quasi nulle pour les alertes critiques.
 
 ---
 
-## 🚀 Démarrage rapide
+## 📺 Dashboard de Monitoring (Streamlit)
+
+### Fonctionnalités principales
+
+- 🔍 **Filtres dynamiques** : session, zone/salle, seuil d'alerte personnalisable
+- 📅 **Timeline interactive** : visualisation chronologique des événements RFID
+- 📊 **Histogramme des durées** de présence par zone
+- 🥧 **Camembert** de répartition des accès par zone
+- 📈 **Courbe cumulative** des allers-retours vers la pharmacie
+- 🚨 **Alertes visuelles** en temps réel (badge rouge + notification)
+- 🔋 **Rapport de consommation** : comparatif des 3 stratégies de transmission
+
+### Aperçu
+
+```
+┌─────────────────────────────────────────────────────┐
+│  🏥 MONITORING HOSPITALIER          [⚠ 2 ALERTES]  │
+├──────────────┬──────────────────────────────────────┤
+│  FILTRES     │  TIMELINE DES ÉVÉNEMENTS             │
+│  Session: ▼  │  ──●──────●──────●──●──────────────  │
+│  Zone: ▼     │  08:00  09:00  10:00  11:00          │
+│  Seuil: [5]  ├──────────────────────────────────────┤
+│              │  DURÉES PAR ZONE      ACCÈS/ZONE     │
+│              │  █████ Pharmacie      🟠 45%          │
+│              │  ███ Bloc A           🔵 30%          │
+│              │  ██ Urgences          🟢 25%          │
+└──────────────┴──────────────────────────────────────┘
+```
+
+### Lancer le dashboard
+
+```bash
+streamlit run dashboard/dashboard.py
+```
+
+Le dashboard est accessible sur `http://localhost:8501`.
+
+---
+
+## 📌 Résultats et Interprétations
+
+| Critère                  | Résultat                                               |
+|--------------------------|--------------------------------------------------------|
+| 🏆 Meilleur modèle       | Arbre de décision — F1-score **0.92**, RAM < 50 Ko     |
+| ⚡ Meilleure transmission | Hybride — **−80% de consommation** vs envoi immédiat   |
+| 🚨 Fausses alertes        | Réduites de ~40% vs règle de seuil simple              |
+| 🏥 Impact métier          | Surveillance efficace de la pharmacie en temps réel    |
+
+---
+
+## ⚙️ Installation et Exécution
 
 ### Prérequis
 
-- Python **3.7+**
-- Packages : `flask` · `pandas` · `requests`
+- Python **3.9+**
+- `pip` et `virtualenv`
+- Jupyter Notebook (pour le preprocessing)
+
+### Étapes
+
+**1. Cloner le dépôt**
 
 ```bash
-pip install flask pandas requests
+git clone https://github.com/votre-org/hospital-iot-monitoring.git
+cd hospital-iot-monitoring
 ```
 
-### Format du dataset d'entrée
-
-Le fichier `data/dataset.csv` doit contenir **au minimum** ces colonnes :
-
-```
-timestamp,person_id,presence
-2024-01-15T08:30:00,CARD_001,0
-2024-01-15T08:30:05,CARD_042,1
-2024-01-15T08:30:10,CARD_007,0
-```
-
-### Lancement
-
-**Étape 1 — Démarrer le serveur** (laisser ce terminal ouvert)
+**2. Créer un environnement virtuel**
 
 ```bash
-cd src
-python server.py
-# * Running on http://0.0.0.0:5000
+python -m venv venv
+source venv/bin/activate        # Linux / macOS
+venv\Scripts\activate           # Windows
 ```
 
-**Étape 2 — Exécuter les clients** (dans d'autres terminaux)
+**3. Installer les dépendances**
 
 ```bash
-cd src
-python client_s1.py   # → génère data/netlog_s1.csv
-python client_s2.py   # → génère data/netlog_s2.csv
-python client_s3.py   # → génère data/netlog_s3.csv
+pip install -r requirements.txt
 ```
 
-**Étape 3 — Vérifier les sorties**
+> **Dépendances principales :** `pandas`, `numpy`, `scikit-learn`, `streamlit`, `plotly`, `joblib`, `scipy`, `jupyter`
+
+**4. Générer les événements RFID simulés**
 
 ```bash
-ls ../data/
-# netlog_s1.csv  netlog_s2.csv  netlog_s3.csv
+jupyter notebook notebooks/01_preprocessing_rfid.ipynb
+# Exécuter toutes les cellules → génère data/processed/rfid_events_simules.csv
+```
+
+**5. Lancer le dashboard Streamlit**
+
+```bash
+streamlit run dashboard/dashboard.py
 ```
 
 ---
 
-## 🔌 API Serveur
+## 🎬 Démonstration
 
-### Endpoint
+> 📽️ *Vidéo de démonstration disponible :* [`assets/demo_dashboard.gif`](assets/demo_dashboard.gif)
 
-```
-POST http://127.0.0.1:5000/data
-Content-Type: application/json
-```
-
-### Payload (requête)
-
-```json
-{
-  "strategy": "S1",
-  "samples": [
-    {
-      "timestamp": "2024-01-15T08:32:11",
-      "person_id": "CARD_042",
-      "presence": 1
-    }
-  ]
-}
-```
-
-> `samples` peut être un **objet unique** ou une **liste d'objets** (utile pour S2).
-
-### Réponse
-
-```json
-{
-  "status": "ok",
-  "t_recv": "2024-01-15T08:32:11.452319"
-}
-```
-
-`t_recv` est utilisé par le client pour calculer la **latence réseau** (`t_recv − t_send`).
-
-### Schéma SQLite
-
-```
-┌──────────────────────────────────────────┐
-│              access_log                  │
-├──────────────┬────────────┬──────────────┤
-│  timestamp   │  TEXT      │ Horodatage   │
-│  person_id   │  TEXT      │ ID carte RFID│
-│  presence    │  INTEGER   │ 0 ou 1       │
-│  strategy    │  TEXT      │ S1 / S2 / S3 │
-└──────────────┴────────────┴──────────────┘
-
-┌──────────────────────────────────────────┐
-│  network_log   (réservée — non utilisée) │
-└──────────────────────────────────────────┘
-```
+Pour une démonstration rapide sans exécution complète du notebook, un fichier de données exemple est inclus dans `data/processed/sample_rfid_events.csv`.
 
 ---
 
-## 📊 Format des logs CSV
+## 🚀 Améliorations Possibles
 
-Chaque fichier `netlog_sX.csv` contient **une ligne par requête effectuée**.
-
-| Colonne | S1 | S2 | S3 | Description |
-|---|:---:|:---:|:---:|---|
-| `strategy` | `"S1"` | `"S2"` | `"S3"` | Identifiant de la stratégie |
-| `t_send` | ✓ | ✓ | ✓ | Horodatage client à l'envoi |
-| `t_recv` | ✓ | ✓ | ✓ | Horodatage serveur retourné |
-| `n_samples` | `1` | `≤ 20` | `1` | Nb de samples dans la requête |
-| `size_bytes` | ✓ | ✓ | ✓ | Taille du payload JSON (octets) |
-
-**Calcul de la latence :**
-
-```
-latence (ms) = (t_recv − t_send) × 1000
-```
+- **Temps réel via MQTT** : intégration d'un broker Mosquitto pour les flux live capteurs
+- **Modèles Edge TPU** : utilisation de TensorFlow Lite + Google Coral pour des modèles plus profonds sans surcoût énergétique
+- **Cartographie des zones** : ajout d'une carte géographique interactive de l'hôpital (Folium/Plotly Maps)
+- **Apprentissage fédéré** : entraînement distribué sur plusieurs dispositifs Raspberry Pi sans centraliser les données patients
+- **Intégration DICOM/HL7** : interconnexion avec les systèmes d'information hospitaliers existants
 
 ---
 
-## 📈 Analyse des résultats
+## 👥 Équipe
 
-```python
-import pandas as pd
+| Nom                  | Rôle                                        |
+|----------------------|---------------------------------------------|
+| **DIAWANE R**      | Ingénieur Data -   |
+| **MOUSSAVOU Audes M**   | Data Engineer –  |
+| **BENZEKRY Aimée A**   | Développeur –            |
+| **?OMBO AZZILE S**   | Développeur –           |
 
-# Charger les logs
-s1 = pd.read_csv("../data/netlog_s1.csv")
-s2 = pd.read_csv("../data/netlog_s2.csv")
-s3 = pd.read_csv("../data/netlog_s3.csv")
-
-# Calculer la latence en millisecondes
-for df in [s1, s2, s3]:
-    df["latency_ms"] = (
-        pd.to_datetime(df["t_recv"]) - pd.to_datetime(df["t_send"])
-    ).dt.total_seconds() * 1000
-
-# Comparaison des indicateurs clés
-for name, df in {"S1": s1, "S2": s2, "S3": s3}.items():
-    print(f"[{name}]  requêtes={len(df):<6}"
-          f"latence_moy={df['latency_ms'].mean():.1f}ms  "
-          f"payload_moy={df['size_bytes'].mean():.0f}B")
-```
-
-**Métriques à comparer :**
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Indicateur          │  S1      │  S2       │  S3       │
-│  ────────────────────┼──────────┼───────────┼───────────│
-│  Nb de requêtes      │  élevé   │  ÷ 20     │  % détect │
-│  Latence moyenne     │  faible  │  élevée   │  faible   │
-│  Payload moyen       │  petit   │  grand    │  petit    │
-│  Trafic total        │  max     │  minimal  │  réduit   │
-└─────────────────────────────────────────────────────────┘
-```
 
 ---
 
-## ⚙️ Personnalisation
+<div align="center">
 
-| Paramètre | Fichier | Valeur par défaut | Comment modifier |
-|---|---|---|---|
-| Taille du batch | `client_s2.py` | `20` | Changer `BATCH_SIZE` |
-| Chemin du dataset | `client_common.py` | `../data/dataset.csv` | Modifier le chemin de lecture |
-| Adresse du serveur | `client_common.py` | `http://127.0.0.1:5000/data` | Changer l'URL cible |
-| Mode fichier CSV | `client_sX.py` | `"w"` (écrase) | Remplacer par `"a"` pour historique |
+*Projet réalisé dans le cadre d'un livrable hospitalier – Tous droits réservés © 2024*
 
----
+[![MIT License](https://img.shields.io/badge/Licence-MIT-green)](LICENSE)
 
-## 📝 Remarques
-
-> **🔴 Important** — Le serveur doit être démarré **avant** tout client.
-
-- Les fichiers `netlog_*.csv` sont **écrasés** à chaque exécution. Pour conserver l'historique, utiliser le mode `"a"` à la place de `"w"`.
-- La table `network_log` de la base SQLite est **réservée** — elle pourrait être étendue pour stocker les métriques réseau côté serveur.
-- Les dossiers `db/` et `data/` sont **créés automatiquement** par les scripts si nécessaire.
-
----
-
-## 🏁 Conclusion
-
-Ce projet fournit une base complète pour étudier l'impact des stratégies de transmission IoT sur les performances réseau :
-
-```
-S1 ──► Réactivité maximale, charge réseau élevée
-S2 ──► Efficacité réseau, latence accrue
-S3 ──► Trafic minimal, filtrage événementiel
-```
-
-Chaque stratégie représente un **compromis** à évaluer selon les contraintes du système cible : bande passante, temps réel, criticité des données.
-
----
-
-*Pour toute question ou contribution, référez-vous aux commentaires dans les fichiers sources.*
+</div>
