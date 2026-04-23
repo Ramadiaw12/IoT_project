@@ -1,0 +1,49 @@
+timestamp,event,location_id,session,is_moving,zone
+2024-01-01 08:00:00,enter,34,1,True,Pharmacie
+2024-01-01 08:00:10,exit,34,1,True,Pharmacie
+2024-01-01 08:00:15,enter,36,1,True,Bureau médecin
+2024-01-01 08:00:20,exit,36,1,True,Bureau médecin
+2024-01-01 08:00:30,enter,34,1,True,Pharmacie
+2024-01-01 08:00:40,exit,34,1,True,Pharmacie
+2024-01-01 08:00:45,enter,36,1,True,Bureau médecin
+2024-01-01 08:00:50,exit,36,1,True,Bureau médecin
+2024-01-01 08:01:00,enter,34,1,True,Pharmacie
+2024-01-01 08:01:10,exit,34,1,True,Pharmacie
+2024-01-01 08:01:15,enter,36,1,True,Bureau médecin
+2024-01-01 08:01:20,exit,36,1,True,Bureau médecin
+2024-01-01 08:01:30,enter,34,1,True,Pharmacie
+2024-01-01 08:01:40,exit,34,1,True,Pharmacie
+2024-01-01 08:01:45,enter,36,1,True,Bureau médecin
+2024-01-01 08:01:50,exit,36,1,True,Bureau médecin
+2024-01-01 08:02:00,enter,34,1,True,Pharmacie
+2024-01-01 08:02:10,exit,34,1,True,Pharmacie
+2024-01-01 08:02:15,enter,36,1,True,Bureau médecin
+2024-01-01 08:02:20,exit,36,1,True,Bureau médecin
+2024-01-01 08:02:30,enter,34,1,True,Pharmacie
+2024-01-01 08:02:40,exit,34,1,True,Pharmacie
+2024-01-01 08:02:45,enter,36,1,True,Bureau médecin
+2024-01-01 08:02:50,exit,36,1,True,Bureau médecin
+2024-01-01 08:03:00,enter,34,1,True,Pharmacie
+2024-01-01 08:03:10,exit,34,1,True,Pharmacie
+2024-01-01 08:03:15,enter,36,1,True,Bureau médecin
+2024-01-01 08:03:20,exit,36,1,True,Bureau médecin
+2024-01-01 08:03:30,enter,34,1,True,Pharmacie
+2024-01-01 08:03:40,exit,34,1,True,Pharmacie
+2024-01-01 08:03:45,enter,36,1,True,Bureau médecin
+2024-01-01 08:03:50,exit,36,1,True,Bureau médecin
+2024-01-01 08:04:00,enter,34,1,True,Pharmacie
+2024-01-01 08:04:10,exit,34,1,True,Pharmacie
+2024-01-01 08:04:15,enter,36,1,True,Bureau médecin
+2024-01-01 08:04:20,exit,36,1,True,Bureau médecin
+2024-01-01 08:04:30,enter,34,1,True,Pharmacie
+2024-01-01 08:04:40,exit,34,1,True,Pharmacie
+2024-01-01 08:04:45,enter,36,1,True,Bureau médecin
+2024-01-01 08:04:50,exit,36,1,True,Bureau médecin
+2024-01-01 08:05:00,enter,34,1,True,Pharmacie
+2024-01-01 08:05:10,exit,34,1,True,Pharmacie
+2024-01-01 08:05:15,enter,36,1,True,Bureau médecin
+2024-01-01 08:05:20,exit,36,1,True,Bureau médecin
+2024-01-01 08:05:30,enter,34,1,True,Pharmacie
+2024-01-01 08:05:40,exit,34,1,True,Pharmacie
+2024-01-01 08:05:45,enter,36,1,True,Bureau médecin
+2024-01-01 08:05:50,exit,36,1,True,Bureau médecin
