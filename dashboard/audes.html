@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MediGuard — Surveillance Hospitalière TinyML</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  /* =========================================================
+     MediGuard Dashboard — Hospital IoT/TinyML Security
+     ========================================================= */
+  :root {
+    --bg: #f4f7fb;
+    --bg-soft: #eaf0f8;
+    --surface: #ffffff;
+    --surface-2: #f8fafd;
+    --border: #e3eaf3;
+    --text: #0f1d35;
+    --text-muted: #6b7a90;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --primary-soft: #dbeafe;
+    --teal: #0ea5b7;
+    --green: #10b981;
+    --green-soft: #d1fae5;
+    --red: #ef4444;
+    --red-soft: #fee2e2;
+    --amber: #f59e0b;
+    --shadow-sm: 0 1px 2px rgba(15,29,53,.05);
+    --shadow: 0 4px 16px rgba(15,29,53,.06);
+    --shadow-lg: 0 12px 32px rgba(15,29,53,.10);
+    --radius: 14px;
+    --radius-lg: 18px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Layout ---------- */
+  .app { display: grid; grid-template-columns: 260px 1fr; height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    background: linear-gradient(180deg, #0f2547 0%, #143263 100%);
+    color: #cbd5e1;
+    padding: 22px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .sidebar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, rgba(37,99,235,.25), transparent 60%);
+    pointer-events: none;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 8px 22px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    margin-bottom: 16px;
+  }
+  .brand-icon {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    border-radius: 12px;
+    display: grid; place-items: center;
+    box-shadow: 0 6px 18px rgba(59,130,246,.4);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .brand-icon svg { width: 22px; height: 22px; color: white; }
+  .brand-icon::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 14px;
+    border: 2px solid rgba(59,130,246,.3);
+    animation: pulse-ring 2s infinite;
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.3); opacity: 0; }
+  }
+  .brand-name { font-weight: 800; font-size: 18px; color: #fff; letter-spacing: -.2px; }
+  .brand-sub { font-size: 11px; color: #94a3b8; letter-spacing: .8px; text-transform: uppercase; }
+
+  .nav-label { font-size: 10px; letter-spacing: 1.5px; color: #64748b; padding: 12px 12px 6px; text-transform: uppercase; font-weight: 600; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: #cbd5e1;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: all .2s ease;
+    position: relative;
+  }
+  .nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+  .nav-item.active {
+    background: linear-gradient(90deg, rgba(59,130,246,.25), rgba(59,130,246,.05));
+    color: #fff;
+  }
+  .nav-item.active::before {
+    content: ""; position: absolute; left: -16px; top: 8px; bottom: 8px; width: 3px;
+    background: linear-gradient(180deg, #3b82f6, #06b6d4); border-radius: 0 3px 3px 0;
+  }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: .85; }
+  .nav-item .badge {
+    margin-left: auto;
+    background: var(--red);
+    color: white;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-weight: 700;
+    min-width: 20px;
+    text-align: center;
+    animation: badge-pop .3s ease-out;
+  }
+  @keyframes badge-pop { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 14px;
+    background: rgba(255,255,255,.04);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgba(255,255,255,.06);
+  }
+  .avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: 13px;
+    flex-shrink: 0;
+  }
+  .footer-name { color: #fff; font-size: 13px; font-weight: 600; }
+  .footer-role { color: #94a3b8; font-size: 11px; }
+
+  /* ---------- Main ---------- */
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+  .topbar {
+    height: 64px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .topbar-left h1 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+  .topbar-left p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .topbar-right { display: flex; align-items: center; gap: 14px; }
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--green-soft);
+    color: #047857;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .live-dot {
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: live-blink 1.4s infinite;
+  }
+  @keyframes live-blink {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,.6); }
+    50% { opacity: .5; box-shadow: 0 0 0 6px rgba(16,185,129,0); }
+  }
+  .clock {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: var(--surface-2);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .icon-btn {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: grid; place-items: center;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all .2s;
+    position: relative;
+  }
+  .icon-btn:hover { background: var(--primary-soft); color: var(--primary); }
+  .icon-btn .notif-dot {
+    position: absolute; top: 6px; right: 6px;
+    width: 8px; height: 8px;
+    background: var(--red);
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+  }
+
+  /* ---------- Content ---------- */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 28px 28px;
+    background: var(--bg);
+  }
+
+  /* ---------- KPI cards ---------- */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 22px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .kpi-card::after {
+    content: "";
+    position: absolute;
+    top: 0; right: 0; width: 80px; height: 80px;
+    background: radial-gradient(circle, var(--accent, var(--primary-soft)) 0%, transparent 70%);
+    opacity: .35;
+    pointer-events: none;
+  }
+  .kpi-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .kpi-label { font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+  .kpi-icon {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    display: grid; place-items: center;
+  }
+  .kpi-icon svg { width: 18px; height: 18px; }
+  .kpi-value {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -.8px;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.1;
+  }
+  .kpi-foot {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .kpi-trend { font-weight: 600; }
+  .kpi-trend.up { color: var(--green); }
+  .kpi-trend.down { color: var(--red); }
+
+  .kpi-card.events  { --accent: #dbeafe; }
+  .kpi-card.alerts  { --accent: #fee2e2; }
+  .kpi-card.normal  { --accent: #d1fae5; }
+  .kpi-card.rate    { --accent: #fef3c7; }
+
+  .kpi-card.events  .kpi-icon { background: #dbeafe; color: var(--primary); }
+  .kpi-card.alerts  .kpi-icon { background: #fee2e2; color: var(--red); }
+  .kpi-card.normal  .kpi-icon { background: #d1fae5; color: var(--green); }
+  .kpi-card.rate    .kpi-icon { background: #fef3c7; color: var(--amber); }
+
+  .kpi-card.alerts.flash {
+    animation: alert-flash .8s ease-out;
+  }
+  @keyframes alert-flash {
+    0% { box-shadow: 0 0 0 0 rgba(239,68,68,.6); transform: scale(1); }
+    50% { box-shadow: 0 0 0 12px rgba(239,68,68,0); transform: scale(1.015); }
+    100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); transform: scale(1); }
+  }
+
+  /* ---------- Mini bar (rate progress) ---------- */
+  .progress-bar {
+    margin-top: 10px;
+    height: 6px;
+    background: var(--bg-soft);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--green), #059669);
+    transition: width .6s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* ---------- Grid layout ---------- */
+  .grid-main {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  .panel {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 10px; }
+  .panel-title-icon {
+    width: 26px; height: 26px;
+    border-radius: 8px;
+    background: var(--primary-soft);
+    display: grid; place-items: center;
+    color: var(--primary);
+  }
+  .panel-title-icon svg { width: 14px; height: 14px; }
+  .panel-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ---------- Filters ---------- */
+  .filter-bar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .chip {
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all .2s;
+    user-select: none;
+  }
+  .chip:hover { background: var(--primary-soft); color: var(--primary); border-color: var(--primary-soft); }
+  .chip.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(37,99,235,.25);
+  }
+
+  /* ---------- Live event table ---------- */
+  .table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 420px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    position: sticky; top: 0;
+    background: var(--surface-2);
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    z-index: 1;
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  tbody tr:hover { background: var(--surface-2); }
+  tbody tr.selected { background: var(--primary-soft); }
+  tbody td {
+    padding: 11px 16px;
+    font-size: 13px;
+  }
+  tbody tr.new-row { animation: slide-in .5s cubic-bezier(.22,.61,.36,1); }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(-12px); background: rgba(37,99,235,.06); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .status-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+  }
+  .status-tag.normal { background: var(--green-soft); color: #047857; }
+  .status-tag.suspect {
+    background: var(--red-soft); color: #b91c1c;
+    animation: status-pulse 1.4s infinite;
+  }
+  @keyframes status-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.4); }
+    50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .zone-tag {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--bg-soft);
+    color: var(--text-muted);
+  }
+
+  .person-cell {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .person-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    color: white;
+    font-weight: 700;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); }
+
+  /* ---------- Right column ---------- */
+  .right-col { display: flex; flex-direction: column; gap: 18px; }
+
+  /* ---------- Detail card ---------- */
+  .detail-body { padding: 18px 20px; }
+  .detail-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+  }
+  .detail-empty svg { width: 44px; height: 44px; opacity: .3; margin-bottom: 10px; }
+  .detail-empty p { font-size: 13px; }
+  .detail-header {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .detail-avatar {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    display: grid; place-items: center;
+    color: white;
+    font-weight: 700;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .detail-name { font-weight: 700; font-size: 15px; }
+  .detail-role { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .detail-item {
+    background: var(--surface-2);
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .detail-item .lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: .5px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .detail-item .val { font-size: 14px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  .detail-status {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .detail-status.normal { background: var(--green-soft); color: #047857; }
+  .detail-status.suspect { background: var(--red-soft); color: #b91c1c; }
+
+  .sensor-bars { margin-top: 14px; }
+  .sensor-row { margin-bottom: 8px; }
+  .sensor-row:last-child { margin-bottom: 0; }
+  .sensor-label {
+    display: flex; justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .sensor-track {
+    height: 6px;
+    background: var(--bg-soft);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .sensor-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width .5s ease, background .3s;
+  }
+
+  /* ---------- Alerts list ---------- */
+  .alerts-list {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 8px 12px;
+  }
+  .alert-empty {
+    padding: 30px 14px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 8px;
+    border-bottom: 1px dashed var(--border);
+    animation: slide-in .4s ease;
+  }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-icon {
+    width: 32px; height: 32px;
+    border-radius: 10px;
+    background: var(--red-soft);
+    color: var(--red);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  .alert-icon svg { width: 16px; height: 16px; }
+  .alert-body { flex: 1; min-width: 0; }
+  .alert-title { font-size: 13px; font-weight: 600; }
+  .alert-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .alert-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  /* ---------- Charts row ---------- */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 18px;
+  }
+  .chart-panel { padding: 16px 18px; height: 240px; }
+  .chart-panel .panel-head {
+    padding: 0 0 12px;
+    border-bottom: none;
+  }
+  .chart-canvas-wrap { position: relative; height: 175px; }
+
+  /* ---------- Scrollbar ---------- */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+  /* Responsive light tweaks */
+  @media (max-width: 1280px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .grid-main { grid-template-columns: 1fr; }
+    .charts-row { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 12l2 2 4-4"></path>
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">MediGuard</div>
+        <div class="brand-sub">TinyML Security</div>
+      </div>
+    </div>
+
+    <div class="nav-label">Surveillance</div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      Tableau de bord
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Flux temps réel
+    </div>
+    <div class="nav-item" id="nav-alerts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Alertes
+      <span class="badge" id="nav-alert-count" style="display:none">0</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      Zones hospitalières
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Personnel
+    </div>
+
+    <div class="nav-label" style="margin-top:14px">Système</div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Modèle TinyML
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Paramètres
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="avatar">RA</div>
+      <div>
+        <div class="footer-name">Ramatoulaye</div>
+        <div class="footer-role">Admin Système</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ========== MAIN ========== -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1>Centre de surveillance</h1>
+        <p>Détection comportementale par capteurs IoT — Modèle TinyML déployé</p>
+      </div>
+      <div class="topbar-right">
+        <span class="live-pill"><span class="live-dot"></span> LIVE — Capteurs actifs</span>
+        <span class="clock" id="clock">--:--:--</span>
+        <button class="icon-btn" title="Notifications">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <span class="notif-dot" id="notif-dot" style="display:none"></span>
+        </button>
+      </div>
+    </header>
+
+    <section class="content">
+      <!-- KPI ROW -->
+      <div class="kpi-row">
+        <div class="kpi-card events">
+          <div class="kpi-head">
+            <span class="kpi-label">Événements totaux</span>
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+          </div>
+          <div class="kpi-value" id="kpi-events">0</div>
+          <div class="kpi-foot"><span class="kpi-trend up">● Live</span> · 1 événement / sec</div>
+        </div>
+        <div class="kpi-card alerts" id="kpi-alerts-card">
+          <div class="kpi-head">
+            <span class="kpi-label">Alertes suspectes</span>
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+          </div>
+          <div class="kpi-value" id="kpi-alerts" style="color:var(--red)">0</div>
+          <div class="kpi-foot"><span id="kpi-alert-rate" class="kpi-trend down">0%</span> du flux</div>
+        </div>
+        <div class="kpi-card normal">
+          <div class="kpi-head">
+            <span class="kpi-label">Activité normale</span>
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          </div>
+          <div class="kpi-value" id="kpi-normal" style="color:var(--green)">0</div>
+          <div class="kpi-foot"><span id="kpi-normal-rate" class="kpi-trend up">100%</span> du flux</div>
+        </div>
+        <div class="kpi-card rate">
+          <div class="kpi-head">
+            <span class="kpi-label">Taux d'activité saine</span>
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg></div>
+          </div>
+          <div class="kpi-value" id="kpi-rate" style="color:var(--amber)">—</div>
+          <div class="progress-bar"><div class="progress-fill" id="rate-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <!-- MAIN GRID -->
+      <div class="grid-main">
+        <!-- LIVE TABLE -->
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">
+                <span class="panel-title-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                </span>
+                Flux d'événements en direct
+              </div>
+              <div class="panel-sub" id="table-sub">Toutes zones · Mise à jour automatique</div>
+            </div>
+            <div class="filter-bar" id="filter-bar">
+              <span class="chip active" data-zone="all">Toutes</span>
+              <span class="chip" data-zone="Bloc opératoire">Bloc opératoire</span>
+              <span class="chip" data-zone="Pharmacie">Pharmacie</span>
+              <span class="chip" data-zone="Urgences">Urgences</span>
+              <span class="chip" data-zone="Réanimation">Réanimation</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Heure</th>
+                  <th>Personnel</th>
+                  <th>Zone</th>
+                  <th>Acc</th>
+                  <th>Gyro</th>
+                  <th>État</th>
+                </tr>
+              </thead>
+              <tbody id="event-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- RIGHT COL -->
+        <div class="right-col">
+          <!-- DETAIL -->
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">
+                  <span class="panel-title-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  </span>
+                  Détail de l'événement
+                </div>
+                <div class="panel-sub">Cliquez sur une ligne pour inspecter</div>
+              </div>
+            </div>
+            <div class="detail-body" id="detail-body">
+              <div class="detail-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <p>Sélectionnez un événement pour voir les détails complets</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ALERT HISTORY -->
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">
+                  <span class="panel-title-icon" style="background:var(--red-soft);color:var(--red)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
+                  </span>
+                  Historique des alertes
+                </div>
+                <div class="panel-sub" id="alert-sub">Aucune alerte</div>
+              </div>
+            </div>
+            <div class="alerts-list" id="alerts-list">
+              <div class="alert-empty">Aucune alerte détectée pour le moment</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHARTS ROW -->
+      <div class="charts-row">
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-title-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/></svg>
+              </span>
+              Activité (60 dernières secondes)
+            </div>
+          </div>
+          <div class="chart-canvas-wrap"><canvas id="chartLine"></canvas></div>
+        </div>
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-title-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              </span>
+              Répartition par zone
+            </div>
+          </div>
+          <div class="chart-canvas-wrap"><canvas id="chartZone"></canvas></div>
+        </div>
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <span class="panel-title-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+              </span>
+              Normal vs Suspect
+            </div>
+          </div>
+          <div class="chart-canvas-wrap"><canvas id="chartDonut"></canvas></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   MediGuard — Real-time data simulator (mirrors predict.ipynb)
+   ============================================================ */
+const ZONES = ["Bloc opératoire", "Pharmacie", "Urgences", "Réanimation"];
+const PEOPLE = [
+  { id: "P1001", name: "Dr. Ahmed Benali",     role: "Chirurgien",        color: "#3b82f6" },
+  { id: "P1002", name: "Sarah Martin",          role: "Infirmière chef",   color: "#10b981" },
+  { id: "P1003", name: "Lucas Dubois",          role: "Pharmacien",        color: "#f59e0b" },
+  { id: "P1004", name: "Emma Lefevre",          role: "Médecin urgentiste",color: "#ec4899" }
+];
+// TinyML weights (from notebook)
+const W1 = 2.5, W2 = 2.5, B = -3;
+
+// Event store
+let counter = 0;
+let events = [];     // newest first
+let alerts = [];     // newest first
+let activeZone = "all";
+let selectedId = null;
+const MAX_EVENTS = 200;
+const MAX_ALERTS = 50;
+
+/* ---- helpers ---- */
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function randInt(n) { return Math.floor(Math.random() * n); }
+function pad(n) { return n < 10 ? "0" + n : "" + n; }
+function formatTime(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
+function initials(name) {
+  return name.replace(/Dr\. /, "").split(" ").map(p => p[0]).slice(0,2).join("").toUpperCase();
+}
+
+/* mirrors generate_sensor_data + tinyml_predict */
+function generateEvent() {
+  counter++;
+  let acc, gyro;
+  // ~20% suspect bias to make dashboard lively (notebook used i%5)
+  if (counter % 5 === 0 || Math.random() < 0.18) {
+    acc = rand(2, 3);
+    gyro = rand(2, 3);
+  } else {
+    acc = rand(0, 1);
+    gyro = rand(0, 1);
+  }
+  const z = W1 * acc + W2 * gyro + B;
+  const prediction = z > 0 ? "suspect" : "normal";
+  const person = PEOPLE[randInt(PEOPLE.length)];
+  const zone = ZONES[randInt(ZONES.length)];
+  const now = new Date();
+  return {
+    id: "EVT-" + counter.toString().padStart(5, "0"),
+    time: now,
+    timeStr: formatTime(now),
+    person_id: person.id,
+    name: person.name,
+    role: person.role,
+    color: person.color,
+    zone,
+    acc: +acc.toFixed(2),
+    gyro: +gyro.toFixed(2),
+    prediction
+  };
+}
+
+/* ---- DOM refs ---- */
+const $tbody       = document.getElementById("event-table");
+const $kpiEvents   = document.getElementById("kpi-events");
+const $kpiAlerts   = document.getElementById("kpi-alerts");
+const $kpiNormal   = document.getElementById("kpi-normal");
+const $kpiRate     = document.getElementById("kpi-rate");
+const $kpiAlertRate= document.getElementById("kpi-alert-rate");
+const $kpiNormalRate=document.getElementById("kpi-normal-rate");
+const $rateFill    = document.getElementById("rate-fill");
+const $alertCard   = document.getElementById("kpi-alerts-card");
+const $alertsList  = document.getElementById("alerts-list");
+const $alertSub    = document.getElementById("alert-sub");
+const $detailBody  = document.getElementById("detail-body");
+const $tableSub    = document.getElementById("table-sub");
+const $navAlertCount = document.getElementById("nav-alert-count");
+const $notifDot    = document.getElementById("notif-dot");
+const $clock       = document.getElementById("clock");
+
+/* ---- KPI animation ---- */
+function animateNumber(el, to) {
+  const from = parseInt(el.dataset.v || "0", 10);
+  if (from === to) return;
+  el.dataset.v = to;
+  const start = performance.now();
+  const dur = 350;
+  function step(ts) {
+    const t = Math.min(1, (ts - start) / dur);
+    const e = 1 - Math.pow(1 - t, 3);
+    const val = Math.round(from + (to - from) * e);
+    el.textContent = val.toLocaleString("fr-FR");
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ---- KPI update ---- */
+function updateKpis() {
+  const total = events.length === 0 ? 0 : counter; // counter = lifetime
+  const totalAlerts = alerts.length === 0 ? 0 : alertsLifetime;
+  const totalNormal = total - totalAlerts;
+  animateNumber($kpiEvents, total);
+  animateNumber($kpiAlerts, totalAlerts);
+  animateNumber($kpiNormal, totalNormal);
+  const ratePct = total ? Math.round((totalNormal / total) * 100) : 100;
+  $kpiRate.textContent = total ? ratePct + "%" : "—";
+  $rateFill.style.width = ratePct + "%";
+  $kpiAlertRate.textContent = total ? Math.round((totalAlerts / total) * 100) + "%" : "0%";
+  $kpiNormalRate.textContent = ratePct + "%";
+
+  if (totalAlerts > 0) {
+    $navAlertCount.style.display = "inline-block";
+    $navAlertCount.textContent = totalAlerts > 99 ? "99+" : totalAlerts;
+    $notifDot.style.display = "block";
+  }
+}
+
+/* ---- Table render ---- */
+function renderTable(newId) {
+  const filtered = activeZone === "all"
+    ? events
+    : events.filter(e => e.zone === activeZone);
+  const view = filtered.slice(0, 60);
+
+  $tbody.innerHTML = view.map(ev => `
+    <tr data-id="${ev.id}" class="${ev.id === newId ? "new-row" : ""} ${ev.id === selectedId ? "selected" : ""}">
+      <td class="mono">${ev.timeStr}</td>
+      <td>
+        <div class="person-cell">
+          <div class="person-avatar" style="background:${ev.color}">${initials(ev.name)}</div>
+          <div>
+            <div style="font-weight:600">${ev.name}</div>
+            <div class="mono">${ev.person_id}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="zone-tag">${ev.zone}</span></td>
+      <td class="mono">${ev.acc.toFixed(2)}</td>
+      <td class="mono">${ev.gyro.toFixed(2)}</td>
+      <td>
+        <span class="status-tag ${ev.prediction}">
+          <span class="status-dot"></span>${ev.prediction === "suspect" ? "SUSPECT" : "NORMAL"}
+        </span>
+      </td>
+    </tr>
+  `).join("");
+
+  $tableSub.textContent = activeZone === "all"
+    ? `Toutes zones · ${filtered.length} événement(s)`
+    : `Zone : ${activeZone} · ${filtered.length} événement(s)`;
+}
+
+/* ---- Selection / Detail ---- */
+function selectEvent(id) {
+  const ev = events.find(e => e.id === id);
+  if (!ev) return;
+  selectedId = id;
+  document.querySelectorAll("#event-table tr").forEach(r => {
+    r.classList.toggle("selected", r.dataset.id === id);
+  });
+  const accPct = Math.min(100, (ev.acc / 3) * 100);
+  const gyroPct = Math.min(100, (ev.gyro / 3) * 100);
+  const accColor = ev.acc > 1.5 ? "var(--red)" : "var(--primary)";
+  const gyroColor = ev.gyro > 1.5 ? "var(--red)" : "var(--primary)";
+  $detailBody.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-avatar" style="background:${ev.color}">${initials(ev.name)}</div>
+      <div style="flex:1; min-width:0">
+        <div class="detail-name">${ev.name}</div>
+        <div class="detail-role">${ev.role} · ${ev.person_id}</div>
+      </div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item"><div class="lbl">Heure</div><div class="val">${ev.timeStr}</div></div>
+      <div class="detail-item"><div class="lbl">Zone</div><div class="val" style="font-family:Inter">${ev.zone}</div></div>
+      <div class="detail-item"><div class="lbl">ID Événement</div><div class="val">${ev.id}</div></div>
+      <div class="detail-item"><div class="lbl">Score TinyML</div><div class="val">${(W1*ev.acc + W2*ev.gyro + B).toFixed(2)}</div></div>
+    </div>
+    <div class="sensor-bars">
+      <div class="sensor-row">
+        <div class="sensor-label"><span>Accélération (acc_magnitude)</span><span>${ev.acc.toFixed(2)} g</span></div>
+        <div class="sensor-track"><div class="sensor-fill" style="width:${accPct}%; background:${accColor}"></div></div>
+      </div>
+      <div class="sensor-row">
+        <div class="sensor-label"><span>Gyroscope (gyro_magnitude)</span><span>${ev.gyro.toFixed(2)} rad/s</span></div>
+        <div class="sensor-track"><div class="sensor-fill" style="width:${gyroPct}%; background:${gyroColor}"></div></div>
+      </div>
+    </div>
+    <div class="detail-status ${ev.prediction}">
+      ${ev.prediction === "suspect"
+        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Mouvement suspect détecté — alerte envoyée`
+        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Comportement normal — aucune action requise`}
+    </div>
+  `;
+}
+
+/* ---- Alerts list ---- */
+function renderAlerts() {
+  if (alerts.length === 0) {
+    $alertsList.innerHTML = `<div class="alert-empty">Aucune alerte détectée pour le moment</div>`;
+    $alertSub.textContent = "Aucune alerte";
+    return;
+  }
+  $alertSub.textContent = `${alertsLifetime} alerte(s) au total`;
+  $alertsList.innerHTML = alerts.slice(0, 12).map(a => `
+    <div class="alert-item">
+      <div class="alert-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
+      </div>
+      <div class="alert-body">
+        <div class="alert-title">${a.name} — ${a.zone}</div>
+        <div class="alert-meta">
+          <span>acc ${a.acc.toFixed(2)}</span>
+          <span>gyro ${a.gyro.toFixed(2)}</span>
+          <span>${a.person_id}</span>
+        </div>
+      </div>
+      <div class="alert-time">${a.timeStr}</div>
+    </div>
+  `).join("");
+}
+
+/* ---- Filter chips ---- */
+document.getElementById("filter-bar").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  activeZone = chip.dataset.zone;
+  renderTable();
+});
+
+/* ---- Click row ---- */
+$tbody.addEventListener("click", e => {
+  const tr = e.target.closest("tr");
+  if (!tr) return;
+  selectEvent(tr.dataset.id);
+});
+
+/* ---- Charts ---- */
+const lineLabels = Array(60).fill("");
+const lineNormal = Array(60).fill(0);
+const lineSuspect = Array(60).fill(0);
+let bucketNormal = 0, bucketSuspect = 0;
+
+const chartLine = new Chart(document.getElementById("chartLine"), {
+  type: "line",
+  data: {
+    labels: lineLabels,
+    datasets: [
+      { label: "Normal", data: lineNormal, borderColor: "#10b981", backgroundColor: "rgba(16,185,129,.15)", fill: true, tension: .35, borderWidth: 2, pointRadius: 0 },
+      { label: "Suspect", data: lineSuspect, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,.15)", fill: true, tension: .35, borderWidth: 2, pointRadius: 0 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 400 },
+    plugins: { legend: { display: true, position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } },
+    scales: {
+      y: { beginAtZero: true, ticks: { font: { size: 10 }, color: "#94a3b8" }, grid: { color: "#eef2f7" } },
+      x: { ticks: { display: false }, grid: { display: false } }
+    }
+  }
+});
+
+const zoneCounts = { "Bloc opératoire": 0, "Pharmacie": 0, "Urgences": 0, "Réanimation": 0 };
+const chartZone = new Chart(document.getElementById("chartZone"), {
+  type: "bar",
+  data: {
+    labels: Object.keys(zoneCounts),
+    datasets: [{
+      data: Object.values(zoneCounts),
+      backgroundColor: ["#3b82f6", "#06b6d4", "#f59e0b", "#ec4899"],
+      borderRadius: 8,
+      barThickness: 22
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, indexAxis: "y",
+    animation: { duration: 350 },
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { beginAtZero: true, ticks: { font: { size: 10 }, color: "#94a3b8" }, grid: { color: "#eef2f7" } },
+      y: { ticks: { font: { size: 11 }, color: "#475569" }, grid: { display: false } }
+    }
+  }
+});
+
+const chartDonut = new Chart(document.getElementById("chartDonut"), {
+  type: "doughnut",
+  data: {
+    labels: ["Normal", "Suspect"],
+    datasets: [{
+      data: [0, 0],
+      backgroundColor: ["#10b981", "#ef4444"],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: "70%",
+    plugins: {
+      legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } }
+    }
+  }
+});
+
+/* line chart bucketing: shift every 1s */
+let alertsLifetime = 0;
+let normalLifetime = 0;
+
+setInterval(() => {
+  lineNormal.shift(); lineNormal.push(bucketNormal);
+  lineSuspect.shift(); lineSuspect.push(bucketSuspect);
+  bucketNormal = 0; bucketSuspect = 0;
+  chartLine.update("none");
+}, 1000);
+
+/* ---- Tick: generate one event per second ---- */
+function tick() {
+  const ev = generateEvent();
+  events.unshift(ev);
+  if (events.length > MAX_EVENTS) events.pop();
+
+  if (ev.prediction === "suspect") {
+    alerts.unshift(ev);
+    alertsLifetime++;
+    if (alerts.length > MAX_ALERTS) alerts.pop();
+    bucketSuspect++;
+    $alertCard.classList.remove("flash");
+    void $alertCard.offsetWidth; // restart animation
+    $alertCard.classList.add("flash");
+  } else {
+    normalLifetime++;
+    bucketNormal++;
+  }
+
+  zoneCounts[ev.zone]++;
+
+  renderTable(ev.id);
+  renderAlerts();
+  updateKpis();
+
+  // update charts data
+  chartZone.data.datasets[0].data = Object.values(zoneCounts);
+  chartZone.update("none");
+  chartDonut.data.datasets[0].data = [normalLifetime, alertsLifetime];
+  chartDonut.update("none");
+
+  // refresh detail if selected event still visible
+  if (selectedId && events.find(e => e.id === selectedId)) {
+    // keep the existing selection's details (no refresh needed unless re-clicked)
+  }
+}
+
+/* ---- Clock ---- */
+function tickClock() {
+  const d = new Date();
+  $clock.textContent = formatTime(d);
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+/* ---- Bootstrap ---- */
+// seed a couple of initial events so dashboard isn't empty
+for (let i = 0; i < 5; i++) {
+  const ev = generateEvent();
+  events.unshift(ev);
+  if (ev.prediction === "suspect") { alerts.unshift(ev); alertsLifetime++; bucketSuspect++; }
+  else { normalLifetime++; bucketNormal++; }
+  zoneCounts[ev.zone]++;
+}
+renderTable();
+renderAlerts();
+updateKpis();
+chartZone.data.datasets[0].data = Object.values(zoneCounts);
+chartZone.update("none");
+chartDonut.data.datasets[0].data = [normalLifetime, alertsLifetime];
+chartDonut.update("none");
+
+// auto-select first event
+if (events[0]) selectEvent(events[0].id);
+
+// Real-time loop
+setInterval(tick, 1000);
+
+/* ---- Sidebar nav: scroll to alerts on click (UX touch) ---- */
+document.getElementById("nav-alerts").addEventListener("click", () => {
+  document.querySelector(".alerts-list").scrollIntoView({ behavior: "smooth", block: "center" });
+});
+</script>
+</body>
+</html>
